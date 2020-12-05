@@ -1,8 +1,10 @@
 //Load required classes.
 const { Sessions, Servers } = require('alta-jsapi');
+const jsapi = require("alta-jsapi");
 const { WebsocketBot } = require('att-bot-core');
 const { BasicWrapper, Connection } = require('att-websockets');
 const Discord = require('discord.js');
+const {Client, RichEmbed} = require('discord.js');
 const moment = require('moment');
 const sha512 = require('crypto-js/sha512');
 const fs = require('fs');
@@ -13,22 +15,20 @@ const Subscriptions = require('./src/subscriptions.js');
 
 //Load information from credentials and config
 const { username, password, botToken } = require("./credentials");
-const { targetServer, showAllServers, blacklistServers, discordPrefix, discordChannels, discordRoles } = require("./config");
-
+const { targetServer, showAllServers, discordPrefix, discordChannels, discordRoles } = require("./config");
 
 //NeDB
 var Datastore = require('nedb');
 var players = new Datastore({ filename : 'data/players.db', autoload: true });
 var kills = new Datastore({ filename : 'data/playerkills.db', autoload: true });
 var chunkHistory = new Datastore({ filename : 'data/chunkhistory.db', autoload: true });
-var spawnables = new Datastore({ filename : 'data/spawnables.db', autoload: true });
 players.ensureIndex({ fieldName: 'id', unique: 'true' });
 players.persistence.setAutocompactionInterval( 129600 );
-spawnables.ensureIndex({ fieldName: 'hash', unique: 'true' });
 
 var connectInterval = 30000; // milliseconds
-var serverPingInterval = 30000; // ms
+var serverPingInterval = 15000; // ms
 var subscriptionConnectInterval = 10000; //ms
+var RefreshSub = 300000; //ms
 var serverConnectedState = false;
 var subscriptionsActive = false;
 var botConnection = {};
@@ -37,7 +37,7 @@ var pendingCommandList = [];
 //Some utility helper functions and prototypes
 function ts()
 { 
-    return "["+ moment().format("h:mm:ss A") +"] " 
+    return "["+ moment().format("YYYY/MM/DD HH:MM:SS") +"] " 
 }
 
 function strrep( str, n )
@@ -49,17 +49,6 @@ function strrep( str, n )
         result += str;
     }
     return result;
-}
-
-// Database helpers
-function insertHandler( err, doc )
-{
-    if ( err ) { console.log( err ); }
-}
-
-function updateHandler( err, rows )
-{
-    if ( err ) { console.log( err ); }
 }
 
 function convertPassToHash( username, password, botToken )
@@ -86,11 +75,10 @@ function convertPassToHash( username, password, botToken )
 
 //Command list
 const commands = {
-    'ping': (message, args) =>
+    'ping': (message) =>
     {
         message.channel.send("pong");
     },
-
     'where': (message, args) =>
     {
         while ( args.length && args[0].toLowerCase() === "is" )
@@ -110,219 +98,6 @@ const commands = {
             }
         });
     },
-
-    'who': (message, args) =>
-    {
-        while( args.length && args[0].toLowerCase() === "is" )
-        {
-            argv = args.shift();
-        }
-
-        var username = args.join(' ');
-        players.findOne({ username: username }, function( err, player ) {
-            if ( err ) 
-            {
-                console.log( err );
-            } else {
-                if ( !player )
-                {
-                    message.channel.send('```'+ "Unknown user: "+ username +'```');
-                } else if ( !player.bio ) { 
-                    message.channel.send('```'+ username +" does not have a bio"+ '```');
-                } else {
-                    message.channel.send('```'+ username +" is "+ player.bio +'```');
-                }
-            }
-        });
-    },
-
-    'bio': (message, args) =>
-    {
-        console.log( args );
-        function updatePlayerBio( playerid, bio )
-        {
-            players.update({ id: playerid }, { $set: { bio: bio } }, {}, function( err, numReplaced ) {
-                if ( err )
-                {
-                    console.log( err );
-                } else {
-                    message.channel.send('```'+ username +" is "+ bio +'```');
-                }
-            });
-        }
-
-        var username = message.author.username;
-        players.findOne({ username: username }, function( err, player ) {
-            if ( err ) {
-                console.log( err );
-            }
-            console.log( player );
-            if ( player )
-            {
-                while ( args[0] === username || args[0] === "is" )
-                {
-                    args.shift();
-                }
-                var bio = args.join(' ');
-                updatePlayerBio( player.id, bio );
-            } else {            
-                username = args.shift();
-                while( args[0] === "is" ) { args.shift(); }
-                var bio = args.join(' ');
-                players.findOne({ username, username }, function( err, player ) {
-                    if ( player )
-                    {
-                        updatePlayerBio( player.id, bio )
-                    } else {
-                        message.channel.send('```'+ "Unknown user: "+ username +'```');
-                    }
-                });
-            }
-        });
-    },
-
-    'servers': async function (message, args)
-    {
-        var servers = await Servers.getOnline();
-
-        if ( !!servers )
-        {
-            var longest = 0;
-            for( var i in servers )
-            {
-                if ( servers[i].name.length > longest )
-                {
-                    longest = servers[i].name.length;
-                }
-            }
-
-            var serverNameLen = longest + 1;
-            var listTable =  "| Servers"+ strrep(' ', (serverNameLen - 7)) +"| Players\n";
-                listTable += "|"+ strrep('-', (serverNameLen + 1) ) +"|---------\n";
-            for ( var i in servers )
-            {
-                if ( blacklistServers.includes( servers[i].id ) )
-                {
-                    continue
-                }
-                if ( !showAllServers && !targetServers.includes( servers[i].id ) )
-                { 
-                    continue 
-                }
-                listTable += "| "+ servers[i].name + strrep(' ', ( serverNameLen - servers[i].name.length )) +"| "+ servers[i].online_players.length +"\n";
-            }
-        
-            message.channel.send( '```'+ listTable +'```' );
-                   
-        } else {
-            message.channel.send("No servers appear to be online, perhaps it's patch day?");
-        }
-    },
-
-    'players': async function (message, args)
-    {
-        var servers = await Servers.getOnline();
-        var listTable = '';
-
-        while ( args.length && ( args[0].toLowerCase() === "online" || args[0].toLowerCase() === "in" || args[0].toLowerCase() === "on" ) )
-        {
-            args.shift();
-        }
-
-        var mustMatch = args.join(' ');
-
-        for( var i in servers )
-        {
-            var pOnline = servers[i].online_players;
-            if ( pOnline.length <= 0 && !mustMatch ) 
-            {
-                continue
-            }
-
-            if ( blacklistServers.includes( servers[i].id ) )
-            {
-                continue;
-            }
-
-            if ( !showAllServers && !targetServers.includes( servers[i].id ) )
-            {
-                continue;
-            }
-            
-            if ( mustMatch )
-            {
-                var re = new RegExp( mustMatch, 'ig' );
-                if ( !servers[i].name.match( re ) )
-                {
-                    continue;
-                }
-            }
-                       
-            listTable += "| "+ servers[i].name +"\n";
-            listTable += "|"+ strrep('-', (servers[i].name.length + 1)) +"\n";     
-
-            if ( pOnline.length <= 0 )
-            {
-                listTable += "| No players online\n"
-            } else {
-                for( var n in pOnline )
-                {
-                    listTable += "| "+ pOnline[n].username +"\n";
-                }
-            }
-
-            listTable += "\n";
-        }
-
-        if ( listTable === '' )
-        {
-            if ( mustMatch )
-            {
-                message.channel.send('```No server found matching "'+ mustMatch +'"```');
-            } else {
-                message.channel.send('```No servers were found online, is it patch day?```');
-            }
-        } else {
-            message.channel.send('```'+ listTable +'```');
-        }
-    },
-
-    'zone': async function (message, args)
-    {
-        switch( args.shift() )
-        {
-            case 'history':
-                var chunkName = args.join(' ');
-                players.find({}, function( err, playerList ) {
-                    chunkHistory.find({ chunk: chunkName }).sort({ ts: -1 }).exec( function( err, chunklist ) {
-                        if ( err )
-                        {
-                            console.log( err );
-                        } else if ( !chunklist ) {
-                            message.channel.send('```'+ "No history for zone '"+ chunkName +"'"+ '```');
-                        } else {
-                            var response  = "| Players who have recently visited zone '"+ chunkName +"'\n";
-                                response += "|--------------------------------"+ strrep( '-', chunkName.length ) +"-\n";
-                            let limit = 1500;
-                            if ( chunklist.length < limit ) { limit = chunklist.length; }
-                            for ( var i = 0; i < limit; i++ ) {
-                                ichunk = chunklist[i];
-                                if ( ++i > 10 ) { }
-                                player = playerList.find( x => x.id === ichunk.player );
-                                response += "|["+ moment( ichunk.ts ).format("YYYY/MM/DD HH:mm:ss") +"] "+ player.username +"\n";
-                                if ( response.length > 1900 ) {
-                                    message.channel.send('```'+ response +'```');
-                                    response = "|--------------------------------"+ strrep( '-', chunkName.length ) +"-\n";
-                                }                        
-                            };
-                            message.channel.send('```'+ response +'```');   
-                        }
-                    });
-                });
-            break;
-        }
-    },       
-
     'player' : async function ( message, args )
     {
         switch( args.shift() )
@@ -364,234 +139,154 @@ const commands = {
             
         }
     },
-
-    'load' : async function( message, args )
+    'players': async function (message, args)
     {
-        switch( args.shift() )
-        {
-            case 'assets':
-                // First verify the message author has correct permission
-                if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) ))
-                {
-                    console.log( ts()+ "loading assets");
-                    message.channel.send('```'+ "Loading ATT assets, please wait" +'```');
+        var servers = await Servers.getOnline();
+        var listTable = '';
 
-                    // Add the handler to pendingCommandList
-                    pendingCommandList.push({
-                        "command" : "spawn list",
-                        "module" : "Alta.Console.Commands.SpawnCommandModule",
-                        "handler": function ( response ) {
-                            let countPrefabs = 0;
-                            let responselines = response.split(/\n/)
-                            responselines.forEach( function( line ) {
-                                let found = line.match( /\|([^|]+)\|([^|]+)\|/ );
-                                if ( found )
-                                {
-                                    found.shift(); // fulltext of match
-                                    let num = new String( found.shift() ).trim() // ID of the prefab
-                                    let val = new String( found.shift() ).trim() // The prefab name
-                                    if ( num.match( /[0-9]+/ ) )
-                                    {
-                                        // It's a prefab!  Store it
-                                        console.log( "found asset: "+ num +" | "+ val )
-                                        spawnables.update({ hash: num }, { $set : { hash: num, name: val } }, { upsert: true }, updateHandler );
-                                        countPrefabs++;
-                                    }
-                                }
-                            });
-                            message.channel.send( '```'+ "Found and stored "+ countPrefabs + " spawnable assets" +'```')
-                        }
-                     });
-
-                     // Finally, execute the command
-                     try {
-                        botConnection.wrapper.send( "spwan list" );
-                    } catch ( e ) {
-                        console.log( e )
-                        message.channel.send( '```'+ "Cannot send command, is server offline?" +'```')
-                        return;
-                    }
-                     
-                } else {
-                    console.log( "invalid permission to load assets" );
-                    message.channel.send('```'+ "You do not have the required permissions" +'```');
-                }
-            break;
-        }
-    },
-
-    'spawn' : async function( message, args )
-    {
-        let playerName = args.shift();
-        let asset = args.shift();
-        let count = args.shift();
-        if ( asset.indexOf(' ') > -1 )
+        while ( args.length && ( args[0].toLowerCase() === "online" || args[0].toLowerCase() === "in" || args[0].toLowerCase() === "on" ) )
         {
-            asset = '"'+ asset +'"';
-        }
-        if ( !count )
-        {
-            count = 1;
+            args.shift();
         }
 
-        // First, verify spawn permission for the users
-        if ( message.member.roles.some( x => discordRoles.spawn.includes( x.id ) ))
-        {
-            // TODO assign permissions to each asset and check the permission here
-            console.log( "Spawning an item: "+ asset +" ("+ count +") for "+ playerName )
-            let command = "spawn " + playerName +' '+ asset +' '+ count;
-            let cmdid = moment.valueOf();
-            pendingCommandList.push({
-                "id" : cmdid,
-                "command" : command,
-                "module" : "Alta.Console.Commands.SpawnCommandModule",
-                "handler": function( response ) {
-                    console.log( response );
-                    let mresponse = response.replace(/Spawning/, "Spawned").replace(/ for/, '('+ count +') for');
-                    message.channel.send('```'+ mresponse +'```');
-                }
-            });
+        var mustMatch = args.join(' ');
 
-            try {
-                botConnection.wrapper.send( command );
-            } catch ( e ) {
-                console.log( e )
-                message.channel.send( '```'+ "Cannot send command, is server offline?" +'```')
-                return;
+        for( var i in servers )
+        {
+            var pOnline = servers[i].online_players;
+            if ( pOnline.length <= 0 && !mustMatch ) 
+            {
+                continue
             }
-            // This checks to see if the command was successful
-            // The command is successful if there is no pendingCommandList item with the cmdid
-            setTimeout( function() {
-                let mpendingCommand = pendingCommandList.find( x => x.id === cmdid );
-                if ( mpendingCommand !== undefined && mpendingCommand.id === cmdid )
-                {
-                    // remove the element to prevent erroneous messages later
-                    for ( var i = 0; i < pendingCommandList.length; i++ )
-                    {
-                        if ( pendingCommandList[i].id === cmdid )
-                        {
-                            pendingCommandList.splice(i,1);
-                            break;
-                        }
-                    }
-                    message.channel.send( '```'+ "Spawn command failed: "+ command +'```' );
-                }
-            }, 10000 )
 
+            if ( !showAllServers && !targetServer.includes( servers[i].id ) )
+            {
+                continue;
+            }
+            
+            if ( mustMatch )
+            {
+                var re = new RegExp( mustMatch, 'ig' );
+                if ( !servers[i].name.match( re ) )
+                {
+                    continue;
+                }
+            }
+                       
+            listTable += "| "+ servers[i].name + "\n";
+            listTable += "|"+ strrep('-', (servers[i].name.length + 1)) +"\n";     
+
+            if ( pOnline.length <= 0 )
+            {
+                listTable += "| No players online\n"
+            } else {
+                for( var n in pOnline )
+                {
+                    listTable += "| "+ pOnline[n].username +"\n";
+                }
+            }
+
+            listTable += "\n";
+        }
+
+        if ( listTable === '' )
+        {
+            if ( mustMatch )
+            {
+                message.channel.send('```No server found matching "'+ mustMatch +'"```');
+            } else {
+                message.channel.send('```No players were found online```');
+            }
         } else {
-            console.log( "invalid permission to load assets: " + message.author.username )
-            message.channel.send('```'+ "You do not have the required permissions to spawn item: " + asset +'```')
+            message.channel.send('```'+ listTable +'```');
         }
     },
-
-    'trade' : async function( message, args )
+    'zone': async function (message, args)
     {
         switch( args.shift() )
         {
-            case 'post':
-                // Spawn items in the player's mailbox
-                let playerName = args.shift();
-                let asset = args.shift();
-                let count = args.shift();
-                if ( asset.indexOf(' ') > -1 )
-                {
-                    asset = '"'+ asset +'"';
-                }
-                if ( !count )
-                {
-                    count = 1;
-                }
-                // First, verify spawn permission for the users
-                if ( message.member.roles.some( x => discordRoles.spawn.includes( x.id ) ))
-                {
-                    // TODO assign permissions to each asset and check the permission here
-                    console.log( "Mailing an item: "+ asset +" ("+ count +") for "+ playerName );
-                    players.findOne({ username : playerName }, function( err, player ) {
-                        if ( !!player && player.id !== undefined )
+            case 'history':
+                var chunkName = args.join(' ');
+                players.find({}, function( err, playerList ) {
+                    chunkHistory.find({ chunk: chunkName }).sort({ ts: -1 }).exec( function( err, chunklist ) {
+                        if ( err )
                         {
-                            let command = "trade post "+ player.id +' '+ asset +' '+ count;
-                            let cmdid = moment.valueOf();
-                            
-                            cmdItem = 
-                            {
-                                "id" : cmdid,
-                                "command" : command,
-                                "module" : "Alta.Console.CommandService",
-                                "handler": function( response ) {
-                                    let success = response.match(/(Started|Finished).*trade\.post/)
-                                    if ( success !== null )
-                                    {
-                                        console.log( response );
-                                        message.channel.send('```'+ "Mailed "+ asset +" ("+ count+") to "+ playerName +'```');
-                                    }
-                                }
-                            };
-                            pendingCommandList.push( cmdItem );
-                            
-                            try {
-                                botConnection.wrapper.send( command );
-                            } catch ( e ) {
-                                console.log( e )
-                                message.channel.send( '```'+ "Cannot send command, is server offline?" +'```')
-                                return;
-                            }
-        
-                            // This checks to see if the command was successful
-                            // The command is successful if there is no pendingCommandList item with the cmdid
-                            setTimeout( function() {
-                                let mpendingCommand = pendingCommandList.find( x => x.id === cmdid );
-                                if ( mpendingCommand !== undefined && mpendingCommand.id === cmdid )
-                                {
-                                    // remove the element to prevent erroneous messages later
-                                    for ( var i = 0; i < pendingCommandList.length; i++ )
-                                    {
-                                        if ( pendingCommandList[i].id === cmdid )
-                                        {
-                                            pendingCommandList.splice(i,1);
-                                            break;
-                                        }
-                                    }
-                                    message.channel.send( '```'+ "Trade post command failed: "+ command +'```' );
-                                }
-                            }, 10000 )
+                            console.log( err );
+                        } else if ( !chunklist ) {
+                            message.channel.send('```'+ "No history for zone '"+ chunkName +"'"+ '```');
                         } else {
-                            message.channel.send( "Player "+ playerName +" is not known, or could not find player ID")
-                        }
-                    })
-                } else {
-                    console.log( "invalid permission to load assets: " + message.author.username )
-                    message.channel.send('```'+ "You do not have the required permissions to post item: " + asset +'```')
-                }
-            break;
-        }
-    },
-
-    'find' : async function( message, args )
-    {
-        switch( args.shift() )
-        {
-            case 'asset':
-            case 'spawnable':
-            case 'item':
-                let mustMatch = args.join(' ');
-                spawnables.find({ name : { $regex: new RegExp( mustMatch, 'gi' ) }}).sort({ name : 1 }).exec( function( err, results ) {
-                    let response  = "| Spawnable items matching "+ mustMatch +" ("+ results.length +")\n";
-                        response += "|--------------------------"+ strrep('-', mustMatch.length) + "-----\n";
-                    let itemc = 0;
-                    results.forEach( function( item ) {
-                        let shortsp = '';
-                        if ( item.hash.length < 5 ) { shortsp = ' '; }
-                        response += "| "+ item.hash + shortsp + " | "+ item.name +"\n";
-                        if ( itemc++ > 20 )
-                        {
-                            message.channel.send('```'+ response +'```')
-                            itemc = 0;
-                            response = '';
+                            var response  = "| Players who have recently visited zone '"+ chunkName +"'\n";
+                                response += "|--------------------------------"+ strrep( '-', chunkName.length ) +"-\n";
+                            let limit = 1500;
+                            if ( chunklist.length < limit ) { limit = chunklist.length; }
+                            for ( var i = 0; i < limit; i++ ) {
+                                ichunk = chunklist[i];
+                                if ( ++i > 10 ) { }
+                                player = playerList.find( x => x.id === ichunk.player );
+                                response += "|["+ moment( ichunk.ts ).format("YYYY/MM/DD HH:mm:ss") +"] "+ player.username +"\n";
+                                if ( response.length > 1900 ) {
+                                    message.channel.send('```'+ response +'```');
+                                    response = "|--------------------------------"+ strrep( '-', chunkName.length ) +"-\n";
+                                }                        
+                            };
+                            message.channel.send('```'+ response +'```');   
                         }
                     });
-                    message.channel.send( '```'+ response +'```')
-                })
+                });
             break;
+        }
+    },
+    'coinbank': (message, args) =>
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+        players.findOne({ username: args[0] }, function(err, docs) {
+            try{
+            message.channel.send( '```'+ "User "+ args[0] + " has "  + docs.Bank +'```' );
+        }
+        catch{
+            message.channel.send( '```'+ "User "+ args[0] + " not found " +'```' );
+        }
+        });
+    }else{
+        message.channel.send( '```'+ "No" +'```' );
+    }
+    },
+    'playermessage': (message, args) =>
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+        //args[0] = player
+        //args[1] = message
+        //args[2] = seconds
+        botConnection.wrapper.send("player message " + args[0] + " " + "'" + args[1] + "'" + " " + args[2]);
+        message.channel.send( '```'+ "Message Sent" +'```' );
+        }else{
+            message.channel.send( '```'+ "No" +'```' );
+        }
+    },
+    'help': (message) =>
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+            const Embed = new RichEmbed()
+            .setColor('#00FF00')
+            .setTitle('Commands')
+            .addField('!ping', 'Replys with pong to indicate bot is online', false )
+            .addField('!where (playername)', 'Replys with the current location of a player', false )
+            .addField('!player path (playername)', 'Replys with a list of every chunk the player has entered', false )
+            .addField('!players', 'Replys with current online server', false )
+            .addField('!zone history (Chunk)', 'Replys with a list of every player to enter the chunk', false )
+            .addField('!coinbank (playername)', 'Checks the current balance of the players current ingame ATM coin count', false )
+            .addField('!playermessage (playername) (Message in quotes) (seconds)', 'Sends an ingame message to a player', false )
+            .addField('!help', 'Replys with a list of commands', false )
+            message.channel.send(Embed);
+        }else{
+            const Embed = new RichEmbed()
+            .setColor('#00FF00')
+            .setTitle('Commands')
+            .addField('!ping', 'Replys with pong to indicate bot is online', false )
+            .addField('!where (playername)', 'Replys with the current location of a player', false )
+            .addField('!players', 'Replys with current online server', false )
+            .addField('!help', 'Replys with a list of commands', false )
+            message.channel.send(Embed);
         }
     }
 }
@@ -620,14 +315,6 @@ function splitArgs( args )
 async function sleep( ms )
 {
     await new Promise( resolve => setTimeout( resolve, ms ))
-}
-
-async function connectToServer( serverId )
-{
-    console.log( "Getting server details:" )
-    var serverDetails = await Servers.joinConsole( serverId )
-    console.log( serverDetails )
-    return serverDetails
 }
 
 async function subscribeTo( subscription, callback )
@@ -659,13 +346,17 @@ async function main()
     //players.find({}).exec( function( err, docs ) { console.log( docs ); });
 
     //Connect to discord
-    const discord = new Discord.Client();
+    const discord = new Discord.Client({
+        disableEveryone: true,
+        messageCacheMaxSize: 150,
+        messageCacheLifetime: 240,
+        messageSweepInterval: 300,
+      });
     await new Promise( resolve =>
     {
         discord.on('ready', resolve);
         discord.login(botToken);
     });
-    
     //Discord command and message management (todo: move to own lib)
     discord.on('message', message =>
     {
@@ -687,147 +378,120 @@ async function main()
         }
     });
                     
-    var subs = new Subscriptions( discordChannels, players, kills, chunkHistory );
+    var subs = new Subscriptions( discordChannels, players, kills, chunkHistory, pendingCommandList );
 
     //Alta Login
     //Sessions.loginWithHash(username, mpassword);
     const bot = new WebsocketBot();
     //Use a hashed password, SHA512
+    await jsapi.Sessions.loginWithUsername(username, mpassword);
     await bot.loginWithHash(username, mpassword);
     while ( true ){
-        
-        console.log( "Checking "+ targetServer )
-        var serverDetails = await Servers.getDetails( targetServer )
-        //console.log( serverDetails )
-        if ( typeof( serverDetails.online_ping ) === 'undefined' )
-        {
-            console.log( "Server is offline" )
-            serverConnectedState = false
-            if ( typeof( botConnection.wrapper ) != undefined && subscriptionsActive ) {
-                console.log( "Removing subscriptions")
-                botConnection.wrapper.emitter.removeAllListeners()
-                subscriptionsActive = false;
-            }
-        } else {
-            if ( !serverConnectedState )
-            {                    
-                console.log( "Server is online, connecting...")
-                var details = await Servers.joinConsole( targetServer )
-                if ( details.allowed )
-                {
-                    console.log( details )
-                    var connection = new Connection( details.name )
-                    try
-                    {
-                        await connection.connect( details.connection.address, details.connection.websocket_port, details.token )
-                    } catch( e ) {
-                        "Cannot connect to server, error: "+ e.message
-                        await sleep( connectInterval )
-                        continue
-                    }
-                    serverConnectedState = true
-                    var wrapper = new BasicWrapper( connection )
+		try {
+			console.log( "Checking "+ targetServer )
+			var serverDetails = await Servers.getDetails( targetServer )
+			//console.log( serverDetails )
+			if ( typeof( serverDetails.online_ping ) === 'undefined' )
+			{
+				console.log( "Server is offline" )
+				serverConnectedState = false
+				if ( typeof( botConnection.wrapper ) != undefined && subscriptionsActive ) {
+					console.log( "Removing subscriptions")
+					botConnection.wrapper.emitter.removeAllListeners()
+					subscriptionsActive = false;
+				}
+			} else {
+				if ( !serverConnectedState )
+				{                    
+					console.log( "Server is online, connecting...")
+					var details = await Servers.joinConsole( targetServer )
+					if ( details.allowed )
+					{
+						//console.log( details )
+						var connection = new Connection( details.name )
+						connection.onClose = (data) => {
+							try {
+								console.log("Server disconnected");
+								serverConnectedState = false;
+								if ( typeof( botConnection.wrapper ) != undefined && subscriptionsActive ) {
+                                    console.log( "Removing subscriptions");
+                                    clearTimeout(Refresh);
+                                    botConnection.wrapper.emitter.removeAllListeners();
+									subscriptionsActive = false;
+								}
+							}
+							catch( e ) {
+								console.log("Error removing subscriptions, error: " + e.message);
+							}
+						};
+						
+						try
+						{
+							await connection.connect( details.connection.address, details.connection.websocket_port, details.token )
+						} catch( e ) {
+							console.log("Cannot connect to server, error: "+ e.message);
+							await sleep( connectInterval )
+							continue
+						}
+						serverConnectedState = true
+						var wrapper = new BasicWrapper( connection )
+						subs.SetWrapper( wrapper )
 
-                    botConnection = 
-                    {
-                        "connection" : connection,
-                        "wrapper" : wrapper
-                    }         
+						botConnection = 
+						{
+							"connection" : connection,
+							"wrapper" : wrapper
+						}         
 
-                    console.log( ts() +"loading inital players" );
-                    for ( var i in serverDetails.online_players )
-                    {
-                        let oplayer = serverDetails.online_players[i];
-                        subs.PlayerJoined( discord, { "user": { "id": oplayer.id, "username": oplayer.username } });
-                    }
-
-                    // Subscriptions
-                    subscribeTo( "InfoLog", data => { subs.InfoLog( discord, data ) } )
-                    subscribeTo( "PlayerJoined", data => { subs.PlayerJoined( discord, data ) } )
-                    subscribeTo( "PlayerLeft", data => { subs.PlayerLeft( discord, data ) } )
-                    subscribeTo( "PlayerKilled", data => { subs.PlayerKilled( discord, data ) } )
-                    subscribeTo( "TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ) } )
-                    subscribeTo( "CreatureKilled", data => { subs.CreatureKilled( discord, data ) } )
-                    subscribeTo( "PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ) } )
-
-                    subscribeTo( "TraceLog", data => {
-                        if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
-                        {
-                            console.log( "the command is a module match" )
-                            // TODO: add a 'type' to pending commands to better match response items
-                            let command = pendingCommandList.shift();
-                            if ( command )
-                            {
-                                console.log( "executing handler" )
-                                command.handler( data.message );
-                            }
+						console.log( ts() +"loading inital players" );
+						for ( var i in serverDetails.online_players )
+						{
+							let oplayer = serverDetails.online_players[i];
+							subs.PlayerJoined( discord, { "user": { "id": oplayer.id, "username": oplayer.username } });
                         }
-                    });
-
-                } else {
-                    console.log( "Server is not connectable")
-                    serverConnectedState = false
-                    console.log( connDetails)
-                }
-            } else {
-                console.log( "Server is connected and alive")
-            }
+                        const Refresh = setTimeout(() => {
+                            botConnection.wrapper.send("save now");
+                            console.log( "Removing subscriptions");
+                            botConnection.wrapper.emitter.removeAllListeners();
+                            subscriptionsActive = false;
+                            // Subscriptions
+                            subscribeTo( "InfoLog", data => { subs.InfoLog( discord, data ) } )
+                            subscribeTo( "PlayerJoined", data => { subs.PlayerJoined( discord, data ) } )
+                            subscribeTo( "PlayerLeft", data => { subs.PlayerLeft( discord, data ) } )
+                            subscribeTo( "PlayerKilled", data => { subs.PlayerKilled( discord, data ) } )
+                            subscribeTo( "TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ) } )
+                            subscribeTo( "CreatureKilled", data => { subs.CreatureKilled( discord, data ) } )
+                            subscribeTo( "PlayerStateChanged", data => { subs.PlayerStateChanged( discord, data ) } )
+                            subscribeTo( "PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ) } )
+                            subscribeTo( "TraceLog", data => {
+                                if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
+                                {
+                                    console.log( "the command is a module match" )
+                                    // TODO: add a 'type' to pending commands to better match response items
+                                    let command = pendingCommandList.shift();
+                                    if ( command )
+                                    {
+                                        console.log( "executing handler" )
+                                        command.handler( data.message );
+                                    }
+                                }
+                            });
+                          }, RefreshSub);
+					} else {
+						console.log( "Server is not connectable")
+						serverConnectedState = false
+						console.log( connDetails)
+					}
+				} else {
+					console.log( "Server is connected and alive")
+				}
+			}
+            await sleep( serverPingInterval )
+        
         }
-        await sleep( serverPingInterval )
+		catch (e) {
+			console.log("Critical error, exiting. " + e.message);
+		}
     }
-
-    //Alta Login
-    //const bot = new WebsocketBot();
-    //Use a hashed password, SHA512
-    //await bot.loginWithHash(username, mpassword);
-    var subs = new Subscriptions( discordChannels, players, kills, chunkHistory );
-
-    //When any of the 'targetServers' are available, a connection is automatically created.
-    await bot.run(test => targetServers.includes(test.id), async (server, connection) =>
-    {
-        console.log( server );
-        console.log( connection );
-
-        //By default, connections simply receive commands, and emit messages.
-        //To add callback support for events, we'll use the "BasicWrapper" provided by att-websockets.
-        var wrapper = new BasicWrapper(connection);
-        
-        botConnection = 
-        {
-            "connection" : connection,
-            "wrapper" : wrapper
-        }
-
-        console.log( ts() +"loading inital players" );
-        for ( var i in server.online_players )
-        {
-            let oplayer = server.online_players[i];
-            subs.PlayerJoined( discord, { "user": { "id": oplayer.id, "username": oplayer.username } });
-        }
-
-        // Subscriptions
-        await wrapper.subscribe("PlayerJoined", data => { subs.PlayerJoined( discord, data ) }); 
-        await wrapper.subscribe("PlayerLeft", data => { subs.PlayerLeft( discord, data ); });
-        await wrapper.subscribe("PlayerKilled", data => { subs.PlayerKilled( discord, data ); });
-        await wrapper.subscribe("TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ); });
-        await wrapper.subscribe("CreatureKilled", data => { subs.CreatureKilled( discord, data ); });
-        await wrapper.subscribe("PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ); });
-        
-        await wrapper.subscribe("TraceLog", data => {
-            if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
-            {
-                console.log( "the command is a module match" )
-                // TODO: add a 'type' to pending commands to better match response items
-                let command = pendingCommandList.shift();
-                if ( command )
-                {
-                    console.log( "executing handler" )
-                    command.handler( data.message );
-                }
-            }
-        });
-
-    });
     // end bot.run()
-
 }

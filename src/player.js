@@ -18,4 +18,7 @@ module.exports = class Player {
     set lastLogin(lastLogin) { this._lastLogin = lastLogin; }
     get lastLogin() { return _lastLogin; }
 
+    set Bank(Bank) { this._Bank = Bank; }
+    get Bank() { return _Bank; }
+
 }

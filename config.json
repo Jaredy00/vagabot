@@ -1,0 +1,25 @@
+{
+    "targetServer" : "Server ID here",
+
+    "discordPrefix" : "!",
+
+    "discordChannels" :
+    {
+        "InfoLog" : "Channel ID Here",
+        "PlayerJoined" : "Channel ID Here",
+        "PlayerLeft" : "Channel ID Here",
+        "PlayerKilled" : "Channel ID Here",
+        "PublicPlayerKilled" : "Channel ID Here",
+        "PlayerMovedChunk" : "Channel ID Here",
+        "TradeDeckUsed" : "Channel ID Here",
+        "CreatureKilled" : "Channel ID Here",
+        "PlayerStateChanged" : "Channel ID Here",
+        "UnauthorizedAccess" : "Channel ID Here",
+        "Cave" : "Channel ID Here"
+    },
+
+    "discordRoles" :
+    {
+        "admin" : [ "Role ID Here", "2nd Role ID Here" ]
+    }
+}

@@ -25,56 +25,69 @@ In short,
 2. Install dependencies with `npm i`
 
 
-The bot uses some JSON configuration files.  You may copy the *.example files provided in the checkout, or create your own.
-
 - **credentials.json** - this file contains the authentication information to connect to Alta API and to Discord
 ```
 {
-    "username" : "<your ATT username>",
-    "password" : "<your ATT password>",
-    "botToken" : "<your bot's discord token>"
+    "username": "ATT Username here",
+    "password": "ATT Password here",
+    "botToken": "Discord Bot Token here"
 }
 ```
 
-- **config.json** - contains the list of A Township Tale servers to join, and the channel destinations for various notifications
+- **config.json** - the channel destinations for various notifications
 ```
 {
-    "targetServer" : <server ID to join>,
+    "targetServer" : "Server ID here",
 
     "discordPrefix" : "!",
 
-    "blacklistServers" : 
-    [
-        <list of server IDs to hide in player lists>
-    ],
-
     "discordChannels" :
     {
-        "InfoLog" : "<discord channel ID>",
-        "PlayerJoined" : "<channel ID>",
-        "PlayerLeft" : "<channel ID>",
-        "PlayerKilled" : "<channel ID>",
-        "PublicPlayerKilled" : "<channel ID>",
-        "PlayerMovedChunk" : "<channel ID>",
-        "TradeDeckUsed" : "<channel ID>",
-        "CreatureKilled" : "<channel ID>",
-        "CreatureSpawned" : "<channel ID>",
+        "InfoLog" : "Channel ID Here",
+        "PlayerJoined" : "Channel ID Here",
+        "PlayerLeft" : "Channel ID Here",
+        "PlayerKilled" : "Channel ID Here",
+        "PublicPlayerKilled" : "Channel ID Here",
+        "PlayerMovedChunk" : "Channel ID Here",
+        "TradeDeckUsed" : "Channel ID Here",
+        "CreatureKilled" : "Channel ID Here",
+        "PlayerStateChanged" : "Channel ID Here",
+        "UnauthorizedAccess" : "Channel ID Here",
+        "Cave" : "Channel ID Here"
     },
 
     "discordRoles" :
     {
-        "admin" : [ <comma sep list of role IDs who can admin the bot> ],
-        "spawn" : [ <comma sep list of role IDs who can spawn items> ]
+        "admin" : [ "Role ID Here", "2nd Role ID Here" ]
     }
 }
 ```
+- **PlayerConfig.json** - contains the list of A Township Tale servers to join, and the channel destinations for various notifications
+```
+{
+"Full Access": ["Player ID here","2nd Player ID here"],
+
+"Comment":[],
+"Chunk ##-##": ["Player ID here","2nd Player ID here"],
+"Chunk ##-##": ["Player ID here","2nd Player ID here"]
+}
+
+Example
+{
+"Full Access": ["3456536765","8765456543"],
+
+"Blacksmith Guild":[],
+"Chunk 12-23": ["92412642412","21412532521"]
+"Chunk 12-24": ["92412642412","21412532521"]
+}
+```
+
 ``` 
 IMPORTANT NOTE: 
 The Discord IDs used in config.json should be quoted (eg. "12345" not 12345 ), they are strings not integers.
-The targetServer ID should *not* be quoted, however.
 ```
 
-Once configured, start the bot going with:
+Once configured, start the bot going with by running the start.bat file or run the following command:
 
 `npm start`
 
@@ -82,93 +95,6 @@ Once configured, start the bot going with:
 The bot spits a lot of data into the console currently.  If you wish to capture this for later perusal, and you're using linux (why wouldn't you be?!), for now you can pipe the poutput to a logfile:
 
 `npm start 2>&1 >> vagabot.log`
-
-
-### Features
-- Notifies when players have enterered or left a server.
-```
-Twidge has joined the server
-Twidge has left the server
-```
-
-- Tracks player movements through the Chunks system
-```
-!where is Twidge
-Twidge is at Chunk 18-33
-```
-
-- Tracks players who have visited a particular zone
-```
-!zone history Chunk 18-33
-// returns a list of players who have recently visited the zone
-```
-
-- Alerts when a player is killed, by other players, PVE mobs, or self-inflicted harm
-```
-Rubk has _slaughtered_ Twidge
-Twidge was murdered by <eg. a spriggull>
-Darklingbird8 has suddenly died from mysterious self-inflicted circimstances
-```
-
-- Gives status of A Township Tale servers and player lists
-```
-!servers
-// returns a list of servers and current player count
-
-!players [server]
-// returns a list of players on the specified server, or all players on all servers
-```
-
-This bot uses some (very) rudimentary filters for "natural language", and some simple pattern matching for filtering results.
-For example, the following are equivalent:
-```
-!where Twidge
-!where is Twidge
-
-!players
-!players online
-
-!players The Vatican
-!players online on the vat
-```
-
-### Commands
-
-`ping` - bot returns 'pong' if it is alive
-
-`where [is] <player>` - return the last known chunk for the player
-
-`who [is] <player>` - return a short bio for the player
-
-`bio [<player>] <message>` - sets a bio message for yourself or the specified user
-
-`servers` - list the servers and player count the bot user has access to, get invited to more servers to see them
-
-`players [<server name>]` - list players on known servers, or just the specified server name.  regex supported.
-
-`zone`
-- `zone history <chunk name>` - list the players who have visited the specified chunk
-
-`player`
-- `player path <player>` - list the last known chunks the player has visited
-
-`load`
-- `load assets` - req role: admin - load the list of spawnable assets, server must be alive
-
-`find`
-- `find asset <name>` - find any spawnable assets matching the name, regex supported
-
-`spawn <player> <prefab> [<count>]` - req role: spawn - spawn something for the specified player
-
-`trade`
-- `trade post <player> <prefab> [<count>]` - req role: spawn - send something to the player's mailbox
-
-
-### Known issues
-
-- Multi-word arguments containing spaces should be quoted, eg. "Barry cooper" or "Evinon Steel Ingot"
-
-- Some event subscription messages are particularly chatty, such as PlayerMovedChunk and CreatureSpawned, so by default are left disabled.
 
 ## Enjoy!
 

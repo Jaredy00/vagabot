@@ -450,7 +450,6 @@ async function main()
 							subs.PlayerJoined( discord, { "user": { "id": oplayer.id, "username": oplayer.username } });
                         }
                         const Refresh = setTimeout(() => {
-                            botConnection.wrapper.send("save now");
                             console.log( "Removing subscriptions");
                             botConnection.wrapper.emitter.removeAllListeners();
                             subscriptionsActive = false;

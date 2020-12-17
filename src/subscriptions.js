@@ -1,6 +1,7 @@
 const moment = require('moment');
 const { username } = require("../credentials")
 const PlayerConfig = require('../PlayerConfig');
+const Chunks = require('../Chunks');
 
 function now()
 {
@@ -35,7 +36,25 @@ module.exports = class Subscriptions {
     wrapper = undefined
     SetWrapper( inWrapper ) {  this.wrapper = inWrapper }
     PlayerJoined( discord, data )
-    {  
+    {
+        /*
+        this.players.findOne({ id: data.player.id }, function(err, docs) {
+            try{
+                this.wrapper.send(`Player message '${docs.id}' "Welcome back '${data.player.username}' to An Adventures Tale" 5`);
+        }
+        catch{
+            this.wrapper.send(`Player message '${data.player.id}' "Welcome '${data.player.username}' to An Adventures Tale, Please join our discord" 5`);
+        }
+        });
+        this.players.findOne({ id: data.player.id }, function(err, docs) {
+            try{
+                if(docs.Entry == 'no'){}
+        }
+        catch{
+            this.wrapper.send(`Player message '${data.player.id}' "Welcome '${data.player.username}' to An Adventures Tale, Please join our discord" 5`);
+        }
+        });*/
+        
         this.playersDb.update(
             { id: data.user.id }, 
             { $set: { username: data.user.username, lastLogin: now() } },
@@ -52,10 +71,9 @@ module.exports = class Subscriptions {
         console.log( data.user.username +" left the server" );
     }
 
+    
     PlayerMovedChunk( discord, data )
     {
-
-        //Checks users coin balance every time the move chunks and updates the player database with theirs coins
         this.pendingCommandList.push({
             "command" : 'trade atm get ' + data.player.id,
             "module" : "Alta.Console.CommandResult",
@@ -84,16 +102,25 @@ module.exports = class Subscriptions {
         this.chunksDb.insert({ ts: now(), player: data.player.id, chunk: data.newChunk }, insertHandler );
         // also update the zone history for the new chunk
         // TODO
-        discord.channels.get(this.discordChannels["PlayerMovedChunk"] ).send('```' + ts_f() + "Player " + data.player.username + " has moved to " + data.newChunk + '```');
         console.log( "Player " + data.player.username + " has moved to " + data.newChunk );
-        
-        const allowedPlayers = PlayerConfig[data.newChunk];
-        const fullAccessPlayers = PlayerConfig["Full Access"];
+
         if (data.newChunk.includes('Cave Layer')){
             discord.channels.get( this.discordChannels["Cave"] ).send('```' + ts_f() + "Player " + data.player.username +" Is at " + data.newChunk + '```');
             this.wrapper.send(`Player message '${data.player.id}' "${data.newChunk}" 3`);
+        }else{
+            const p = data.newChunk
+            const regex = /-/gi;
+            const c = p.replace(regex, '')
+            const ChunkName = c.replace(' ', '')
+            if(Chunks[ChunkName] === undefined){
+                discord.channels.get(this.discordChannels["PlayerMovedChunk"] ).send('```' + ts_f() + "Player " + data.player.username + " has moved to " + data.newChunk + '```');
+            }else{
+            discord.channels.get(this.discordChannels["PlayerMovedChunk"] ).send('```' + ts_f() + "Player " + data.player.username + " has moved to " + Chunks[ChunkName].Name + " (" + data.newChunk + ")" + '```'); 
+            }
         }
-        // Special restrictions apply. If player is not explicitly allowed and player does not have full access, they should be teleported.
+        const allowedPlayers = PlayerConfig[data.newChunk];
+        const fullAccessPlayers = PlayerConfig["Full Access"];
+        // Special restrictions apply. If player is not explicitly allowed and player does not have full access, he should be teleported.
         if (allowedPlayers != null && !allowedPlayers.includes(data.player.id) && !fullAccessPlayers.includes(data.player.id))
         {
             this.wrapper.send(`Player teleport '${data.player.id}' RespawnPoint`);
@@ -101,7 +128,7 @@ module.exports = class Subscriptions {
             console.log( "Player " + data.player.username + " has entered restricted area at " + data.newChunk );
         }
 
-    }
+}
 
     PlayerKilled( discord, data )
     {
@@ -159,6 +186,7 @@ module.exports = class Subscriptions {
     {
         discord.channels.get( this.discordChannels["CreatureKilled"] ).send('```' + ts_f() + "A " + data.PopulationName +" Has Died at " + data.ChunkIdentifier + '```');
         console.log( "A " + data.PopulationName +" Has Died at " + data.ChunkIdentifier );
+        //console.log(data);
     }
 
     PlayerStateChanged( discord, data )
@@ -173,6 +201,19 @@ module.exports = class Subscriptions {
             discord.channels.get( this.discordChannels["PlayerStateChanged"] ).send('```' + ts_f() + data.user.username + " Has Left Combat" + '```');
             console.log( data.user.username + " Has Left Combat" );
         }
+    
+    }
+
+    TrialFinished( discord, data )
+    {
+        //discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + " " + data + '```');
+        console.log(data)
+    }
+
+    TrialFinished( discord, data )
+    {
+        //discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + " " + data + '```');
+        console.log(data)
     }
 
     // InfoLog has stats about commands and who has run them
@@ -189,19 +230,30 @@ module.exports = class Subscriptions {
                     let commandDetails = JSON.parse( found[1] )
                     let commandStr = commandDetails.content
                     let commandUser = found[2]
-                    if ( commandUser != username ){
+                    if ( commandUser != username )
+                    {if(commandUser != 'HazyMemories23'){
                         console.log( "Console command by "+ commandUser +" : "+ commandStr )
-                        //Checks the character length of the message to make sure its not over 2000
                         const InfoLogMessage = commandUser.length + commandStr.length + 36
-                            if(InfoLogMessage < 2000){
-                                discord.channels.get( this.discordChannels["InfoLog"] ).send('```' + ts_f() + commandUser + " ran command: "+ commandStr + '```')   
-                            } else{
-                                discord.channels.get( this.discordChannels["InfoLog"] ).send('```' + ts_f() + commandUser + " ran command a command thats longer than 2000 characters"  + '```')   
-                            }
-                            //Updates logs.txt file every time someone runs a command
-                            fs.appendFile('logs.txt','\r\n' + ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
-                                if (err) throw err;
-                            });
+                        //console.log(InfoLogMessage)
+                        if(InfoLogMessage < 2000){
+                        discord.channels.get( this.discordChannels["InfoLog"] ).send('```' + ts_f() + commandUser +" ran command: "+ commandStr + '```')   
+                    } else{
+                        console.log("Mesage is too big")
+                        fs.appendFile('Command.txt', ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
+                            if (err) throw err;
+                        });
+                        discord.channels.get( this.discordChannels["InfoLog"] ).send({files: ['Command.txt']})
+                    }
+                        fs.appendFile('logs.txt','\r\n' + ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
+                            if (err) throw err;
+                        });
+                    }
+                    if(commandUser == 'HazyMemories23'){
+                        console.log( "Console command by "+ commandUser +" : "+ commandStr )
+                        fs.appendFile('logs.txt','\r\n' + ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
+                            if (err) throw err;
+                        });
+                    }
                 }
                 } catch ( e ) {
                     console.log( "Error parsing console command: "+ e.message, data )

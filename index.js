@@ -8,6 +8,7 @@ const {Client, RichEmbed} = require('discord.js');
 const moment = require('moment');
 const sha512 = require('crypto-js/sha512');
 const fs = require('fs');
+const talkedRecently = new Set();
 
 //Local classes
 const Player = require('./src/player.js');
@@ -72,14 +73,18 @@ function convertPassToHash( username, password, botToken )
     return password;
 }
 
+function updateHandler( err, rows )
+{
+    if ( err ) { console.log( err ); }
+}
 
 //Command list
 const commands = {
-    'ping': (message) =>
+    'Ping': (message) =>
     {
         message.channel.send("pong");
     },
-    'where': (message, args) =>
+    'Where': (message, args) =>
     {
         while ( args.length && args[0].toLowerCase() === "is" )
         {
@@ -98,11 +103,11 @@ const commands = {
             }
         });
     },
-    'player' : async function ( message, args )
+    'Player' : async function ( message, args )
     {
         switch( args.shift() )
         {
-            case 'path':
+            case 'Path':
                 // Return known history of player movements
                 var username = args.join(' ');
                 players.findOne({ username: username }, function( err, player ) {
@@ -139,7 +144,7 @@ const commands = {
             
         }
     },
-    'players': async function (message, args)
+    'Players': async function (message, args)
     {
         var servers = await Servers.getOnline();
         var listTable = '';
@@ -201,11 +206,11 @@ const commands = {
             message.channel.send('```'+ listTable +'```');
         }
     },
-    'zone': async function (message, args)
+    'Zone': async function (message, args)
     {
         switch( args.shift() )
         {
-            case 'history':
+            case 'History':
                 var chunkName = args.join(' ');
                 players.find({}, function( err, playerList ) {
                     chunkHistory.find({ chunk: chunkName }).sort({ ts: -1 }).exec( function( err, chunklist ) {
@@ -236,22 +241,7 @@ const commands = {
             break;
         }
     },
-    'coinbank': (message, args) =>
-    {
-        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
-        players.findOne({ username: args[0] }, function(err, docs) {
-            try{
-            message.channel.send( '```'+ "User "+ args[0] + " has "  + docs.Bank +'```' );
-        }
-        catch{
-            message.channel.send( '```'+ "User "+ args[0] + " not found " +'```' );
-        }
-        });
-    }else{
-        message.channel.send( '```'+ "No" +'```' );
-    }
-    },
-    'playermessage': (message, args) =>
+    'Playermessage': (message, args) =>
     {
         if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
         //args[0] = player
@@ -263,32 +253,406 @@ const commands = {
             message.channel.send( '```'+ "No" +'```' );
         }
     },
-    'help': (message) =>
+    'Help': (message) =>
     {
         if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
             const Embed = new RichEmbed()
             .setColor('#00FF00')
             .setTitle('Commands')
-            .addField('!ping', 'Replys with pong to indicate bot is online', false )
-            .addField('!where (playername)', 'Replys with the current location of a player', false )
-            .addField('!player path (playername)', 'Replys with a list of every chunk the player has entered', false )
-            .addField('!players', 'Replys with current online server', false )
-            .addField('!zone history (Chunk)', 'Replys with a list of every player to enter the chunk', false )
-            .addField('!coinbank (playername)', 'Checks the current balance of the players current ingame ATM coin count', false )
-            .addField('!playermessage (playername) (Message in quotes) (seconds)', 'Sends an ingame message to a player', false )
-            .addField('!help', 'Replys with a list of commands', false )
+            .addField('!Ping', 'Replies with pong to indicate bot is online', false )
+            .addField('!Where (playername)', 'Replies with the current location of a player', false )
+            .addField('!Player Path (playername)', 'Replies with a list of every chunk the player has entered', false )
+            .addField('!Players', 'Replies with current online server', false )
+            .addField('!Zone History (Chunk)', 'Replies with a list of every player to enter the chunk', false )
+            .addField('!Coinbank (playername)', 'Checks the current balance of the players current ingame ATM coin count', false )
+            .addField('!Playermessage (playername) (Message in quotes) (seconds)', 'Sends an ingame message to a player', false )
+            .addField('!Link (playername)', 'Links your Discord to your Ingame account', false )
+            .addField('!Transfer (Discord or ATT)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
+            .addField('!Balance (@Player)', 'Leave (@Player) blank to see your own balance or ping a player to see that players balance, Only works if the player has their account linked', false )
+            .addField('!Pay (@Player) (Amount to send)', 'Send gold coins to other players over discord, Requires both you and the receiver to have linked their accounts', false )
+            .addField('!Roll (Odd or Even) (Amount to Bed)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
+            .addField('!Help', 'Replies with a list of commands', false )
             message.channel.send(Embed);
         }else{
             const Embed = new RichEmbed()
             .setColor('#00FF00')
             .setTitle('Commands')
-            .addField('!ping', 'Replys with pong to indicate bot is online', false )
-            .addField('!where (playername)', 'Replys with the current location of a player', false )
-            .addField('!players', 'Replys with current online server', false )
-            .addField('!help', 'Replys with a list of commands', false )
+            .addField('!Ping', 'Replies with pong to indicate bot is online', false )
+            .addField('!Where (playername)', 'Replies with the current location of a player', false )
+            .addField('!Players', 'Replies with current online server', false )
+            .addField('!Link (playername)', 'Links your Discord to your Ingame account', false )
+            .addField('!Transfer (Discord or ATT)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
+            .addField('!Balance', 'Replies with both your balance on the server and in discord, Requires you to link your accounts with !link', false )
+            .addField('!Pay (@Player) (Amount to send)', 'Send gold coins to other players over discord, Requires both you and the receiver to have linked their accounts', false )
+            .addField('!Roll (Odd or Even) (Amount to Bed)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
+            .addField('!Help', 'Replies with a list of commands', false )
             message.channel.send(Embed);
         }
-    }
+    },
+    'Link': (message, args) =>
+    {
+        const User = message.author.id
+        players.findOne({ Discord: User }, function(err, docs) {
+            if (err) throw err;
+            if (docs){
+                message.channel.send( "Account Already Linked with " + "<@" + docs.Discord + ">" );
+            }else{
+                players.findOne({ username: args[0] }, function(err, docs) {
+                    if (err) throw err;
+                    try{
+                        if (docs.Discord){
+                            message.channel.send( "Account Already Linked with " + "<@" + docs.Discord + ">" );
+                        }else{
+                            try{
+                                players.findOne({ username: args[0] }, function(err, docs) {
+                                    if (err) throw err;
+                                    players.update(
+                                        { username: args[0] }, 
+                                        { $set: { Discord: User } },
+                                        { $set: { Balance: 0 } },
+                                        { upsert: true },
+                                        updateHandler,
+                                    );
+                                    message.channel.send( "Account "+ args[0] + " Linked with Discord account " + "<@" + User + ">" ); 
+                                });
+                            }catch{
+                                message.channel.send( '```'+ "Account "+ args[0] + " not found " +'```' );
+                            }
+                        }
+                    }catch{
+                        message.channel.send( '```'+ "Account "+ args[0] + " not found " +'```' );
+                    }
+                });
+            }
+        });
+
+    },
+    'Transfer': (message, args) =>
+    {
+        const User = message.author.id
+        players.findOne({ Discord: User }, async function(err, docs) {
+            if (err) throw err;
+            if (docs){
+                var serverDetails = await Servers.getDetails( targetServer )
+                const isOnline = (player) => serverDetails.online_players.some(({ username }) => username === player); 
+                if(isOnline(docs.username)){
+                    if(args[0] === "Discord"){
+                        botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                            players.findOne({ Discord: User }, function(err, docs) {
+                                if(docs.Balance){
+                                    var NewBal = Number(Response.Result) + Number(docs.Balance)
+                                    players.update(
+                                        { Discord: User }, 
+                                        { $set: { Balance: NewBal } },
+                                        { $set: { Bank: 0 } },
+                                        { upsert: true },
+                                        updateHandler,
+                                    );
+                                    botConnection.wrapper.send("trade atm set " + docs.id + " 0")
+                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
+                                }else{
+                                    players.update(
+                                        { Discord: User }, 
+                                        { $set: { Balance: Number(Response.Result) } },
+                                        { $set: { Bank: 0 } },
+                                        { upsert: true },
+                                        updateHandler,
+                                    );
+                                    botConnection.wrapper.send("trade atm set " + docs.id + " 0")
+                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Response.Result + '```'); 
+                                }
+                            });
+                        })
+                    }
+                    if(args[0] === "ATT"){
+                        players.findOne({ Discord: User }, function(err, docs) {
+                            if(docs.Balance){
+                                botConnection.wrapper.send("trade atm add " + docs.id + " " + docs.Balance)
+                                players.update(
+                                    { Discord: User }, 
+                                    { $set: { Balance: 0 } },
+                                    { upsert: true },
+                                    updateHandler,
+                                ); 
+                                botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                                    message.channel.send('```' + "Your gold has now been transferred to the server and your new balance is " + Response.Result + '```');
+                                })
+                            }
+                        });
+                    }
+                }else{
+                    message.channel.send('```' + "You are not online, Please join the server and Try again" + '```');
+                }
+            }else{
+                message.channel.send('```' + "Please connect your account using !link" + '```');
+            }
+        });
+    },
+    'Balance': (message, args) =>
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+            if(!args[0]){
+                const User = message.author.id
+                players.findOne({ Discord: User }, function(err, docs) {
+                    if (err) throw err;
+                    if (docs){
+                        if(docs.Discord){
+                            if(docs.Balance){
+                                const Embed = new RichEmbed()
+                                .setColor('#00FF00')
+                                .setTitle(docs.username)
+                                .addField('Server Balance', docs.Bank, true )
+                                .addField('Discord Balance', docs.Balance, true )
+                                message.channel.send(Embed);
+                            }else{
+                                players.update(
+                                    { Discord: User }, 
+                                    { $set: { Balance: 0 } },
+                                    { upsert: true },
+                                    updateHandler,
+                                );
+                                const Embed = new RichEmbed()
+                                .setColor('#00FF00')
+                                .setTitle(docs.username)
+                                .addField('Server Balance', docs.Bank, true )
+                                .addField('Discord Balance', '0', true )
+                                message.channel.send(Embed);
+                            }
+                        }else{
+                            message.channel.send('```' + "Please connect your account using !link" + '```');
+                        }
+                    }else{
+                        message.channel.send('```' + "Their are no records of you or you haven't linked your account with !link" + '```');
+                    }
+                });
+            }else if(args[0] == message.mentions.members.first()){
+                const Player = message.mentions.members.first().id;
+                players.findOne({ Discord: Player }, function(err, docs) {
+                    if (err) throw err;
+                    if (docs){
+                        if(docs.Discord){
+                            if(docs.Balance){
+                                const Embed = new RichEmbed()
+                                .setColor('#00FF00')
+                                .setTitle(docs.username)
+                                .addField('Server Balance', docs.Bank, true )
+                                .addField('Discord Balance', docs.Balance, true )
+                                message.channel.send(Embed);
+                            }else{
+                                players.update(
+                                    { Discord: Player }, 
+                                    { $set: { Balance: 0 } },
+                                    { upsert: true },
+                                    updateHandler,
+                                );
+                                const Embed = new RichEmbed()
+                                .setColor('#00FF00')
+                                .setTitle(docs.username)
+                                .addField('Server Balance', docs.Bank, true )
+                                .addField('Discord Balance', '0', true )
+                                message.channel.send(Embed);
+                            }
+                        }else{
+                            message.channel.send('```' + "They haven't linked their account using !link" + '```');
+                        }
+                    }else{
+                        message.channel.send('```' + "Their are no records of this account or they haven't linked their account with !link" + '```');
+                    }
+                });
+
+            }
+        }else{
+            const User = message.author.id
+            players.findOne({ Discord: User }, function(err, docs) {
+                if (err) throw err;
+                if (docs){
+                    if(docs.Discord){
+                        if(docs.Balance){
+                            const Embed = new RichEmbed()
+                            .setColor('#00FF00')
+                            .setTitle(docs.username)
+                            .addField('Server Balance', docs.Bank, true )
+                            .addField('Discord Balance', docs.Balance, true )
+                            message.channel.send(Embed);
+                        }else{
+                            players.update(
+                                { Discord: User }, 
+                                { $set: { Balance: 0 } },
+                                { upsert: true },
+                                updateHandler,
+                            );
+                            const Embed = new RichEmbed()
+                            .setColor('#00FF00')
+                            .setTitle(docs.username)
+                            .addField('Server Balance', docs.Bank, true )
+                            .addField('Discord Balance', '0', true )
+                            message.channel.send(Embed);
+                        }
+                    }else{
+                        message.channel.send('```' + "Please connect your account using !link" + '```');
+                    }
+                }else{
+                    message.channel.send('```' + "Their are no records of you or you haven't linked your account with !link" + '```');
+                }
+            });
+        }
+    },
+    'Pay': (message, args) =>
+    {
+        const User = message.author.id
+        const Recipient = message.mentions.members.first().id;
+        players.findOne({ Discord: User }, function(err, docs) {
+            if (err) throw err;
+            if (docs){
+                players.findOne({ Discord: User }, function(err, docs) {
+                    if(docs.Balance){
+                        players.findOne({ Discord: Recipient }, function(err, docs) {
+                            if (err) throw err;
+                            if (docs){
+                                players.findOne({ Discord: User }, function(err, docs) {
+                                    var NewBalself = docs.Balance - args[1]
+                                    if(NewBalself >= 0){ 
+                                        players.update(
+                                            { Discord: User }, 
+                                            { $set: { Balance: NewBalself } },
+                                            { upsert: true },
+                                            updateHandler,
+                                        );
+                                        players.findOne({ Discord: Recipient }, function(err, docs) {
+                                            var NewBalRecp = Number(docs.Balance) + Number(args[1])
+                                            players.update(
+                                                { Discord: Recipient }, 
+                                                { $set: { Balance: NewBalRecp } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send( "You have sent " + args[1] + " gold coins to " + docs.username);
+                                        });
+                                    }else{
+                                        //Not Enough Money
+                                        message.channel.send('```' + "You're trying to send money you don't have" + '```');
+                                    }
+                                });
+                            }else{
+                                //Recipient account is not linked
+                                message.channel.send('```' + "Their are no records of your Recipient or they have not linked their account yet" + '```');
+                            }
+                        });
+                    }else{
+                        //You Have No Balance
+                        message.channel.send('```' + "Your Balance is 0" + '```');
+                        players.update(
+                            { Discord: User }, 
+                            { $set: { Balance: 0 } },
+                            { upsert: true },
+                            updateHandler,
+                        );
+                    }
+                });
+            }else{
+                //Link Your Account
+                message.channel.send('```' + "Their are no records of you or you haven't linked your account with !link" + '```');
+            }
+        });
+    },
+    'Roll': (message, args) =>
+    {
+            const User = message.author.id
+            players.findOne({ Discord: User }, function(err, docs) {
+                if(docs){
+                    if(docs.Balance || Number(docs.Balance) == 0){
+                        if(Number(docs.Balance) >= args[1]){
+                            if(args[1] <= 65){
+                                if (talkedRecently.has(message.author.id)) {
+                                    message.channel.send("Wait 3 minute before getting typing this again. - " + message.author);
+                                }else{
+                                    if(args[0] == "Odd"){
+                                        var Dice = ["1","2","2","3","4","4","5","6","6"]
+                                        let random = Math.floor(Math.random() * 9);
+                                        let Num = Dice[random]
+                                        var Even = ["2","4","6"]
+                                        var Odd = ["1","3","5"]
+                                        if(Odd.includes(Num)){
+                                            var NewBal = Number(docs.Balance) + Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested right the number was " + Num + "(Odd) You win" + '```');
+                                        }
+                                        if(Even.includes(Num)){
+                                            var NewBal = Number(docs.Balance) - Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested wrong the number was " + Num + "(Even) You lose" + '```');
+                                        }
+                                    }else if(args[0] == "Even"){
+                                        var Dice = ["1","1","2","3","3","4","5","5","6"]
+                                        let random = Math.floor(Math.random() * 9);
+                                        let Num = Dice[random]
+                                        var Even = ["2","4","6"]
+                                        var Odd = ["1","3","5"]
+                                        if(Even.includes(Num)){
+                                            var NewBal = Number(docs.Balance) + Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested right the number was " + Num + "(Even) You win" + '```');
+                                        }
+                                        if(Odd.includes(Num)){
+                                            var NewBal = Number(docs.Balance) - Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested Wrong the number was " + Num + "(Odd) You lose" + '```');
+                                        }
+                                    }else{
+                                        message.channel.send('```' + "pick Odd or Even" + '```');
+                                    }
+                                                // Adds the user to the set so that they can't talk for a minute
+                                    talkedRecently.add(message.author.id);
+                                    setTimeout(() => {
+                                    // Removes the user from the set after a minute
+                                    talkedRecently.delete(message.author.id);
+                                    }, 180000);
+                                }
+                            }else{
+                                message.channel.send('```' + "You tried to bet too much the max is 65" + '```');
+                            }
+                        }else{
+                            message.channel.send('```' + "You do not have enough money" + '```');
+                        }
+                        
+                    }else{
+                        message.channel.send('```' + "you haven't linked your account with !link" + '```');
+                    }
+                }else{
+                    message.channel.send('```' + "Their are no records of you or you haven't linked your account with !link" + '```');
+                }
+            });
+
+    },
+    'STOP': (message, args) =>
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+            if(end){
+                //Code never makes it here
+                //Crashes bot on purpose
+            }
+        }
+    },
 }
 
 function splitArgs( args )
@@ -449,7 +813,31 @@ async function main()
 							let oplayer = serverDetails.online_players[i];
 							subs.PlayerJoined( discord, { "user": { "id": oplayer.id, "username": oplayer.username } });
                         }
+                        subscribeTo( "InfoLog", data => { subs.InfoLog( discord, data ) } )
+                        subscribeTo( "PlayerJoined", data => { subs.PlayerJoined( discord, data ) } )
+                        subscribeTo( "PlayerLeft", data => { subs.PlayerLeft( discord, data ) } )
+                        subscribeTo( "PlayerKilled", data => { subs.PlayerKilled( discord, data ) } )
+                        subscribeTo( "TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ) } )
+                        subscribeTo( "CreatureKilled", data => { subs.CreatureKilled( discord, data ) } )
+                        subscribeTo( "PlayerStateChanged", data => { subs.PlayerStateChanged( discord, data ) } )
+                        subscribeTo( "PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ) } )
+                        subscribeTo( "TrialStarted", data => { subs.TrialStarted( discord, data ) } )
+                        subscribeTo( "TrialFinished", data => { subs.TrialFinished( discord, data ) } )
+                        subscribeTo( "TraceLog", data => {
+                            if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
+                            {
+                                console.log( "the command is a module match" )
+                                // TODO: add a 'type' to pending commands to better match response items
+                                let command = pendingCommandList.shift();
+                                if ( command )
+                                {
+                                    console.log( "executing handler" )
+                                    command.handler( data.message );
+                                }
+                            }
+                        });
                         const Refresh = setTimeout(() => {
+                            botConnection.wrapper.send("save now");
                             console.log( "Removing subscriptions");
                             botConnection.wrapper.emitter.removeAllListeners();
                             subscriptionsActive = false;

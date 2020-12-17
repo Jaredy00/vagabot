@@ -1,7 +1,7 @@
 {
-"Full Access": ["Player ID here","2nd Player ID here"],
+"Full Access": [],
 
-"Name of Location":[],
-"Chunk here formated as Chunk ##-##": ["Player ID here","2nd Player ID here"],
-"2nd Chunk here formated as Chunk ##-##": ["Player ID here","2nd Player ID here"]
+"JustAsalty House":[],
+"Chunk 25-23" : [28259646, 593820417, 123422794],
+"Chunk 24-23": [28259646, 593820417, 123422794]
 }

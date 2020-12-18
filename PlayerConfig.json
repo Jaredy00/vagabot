@@ -1,10 +1,16 @@
 {
-"Full Access": [],
- 
-"Chunk" : [],
-"Chunk ##-##" : [######, [######, [######],
- 
-"JustAsalty House":[],
-"Chunk 25-23" : [28259646, 593820417, 123422794],
-"Chunk 24-23": [28259646, 593820417, 123422794]
+"Full Access": ["Player ID here","2nd Player ID here"],
+
+"Comment":[],
+"Chunk ##-##": ["Player ID here","2nd Player ID here"],
+"Chunk ##-##": ["Player ID here","2nd Player ID here"]
+}
+
+Example
+{
+"Full Access": ["3456536765","8765456543"],
+
+"Blacksmith Guild":[],
+"Chunk 12-23": ["92412642412","21412532521"]
+"Chunk 12-24": ["92412642412","21412532521"]
 }

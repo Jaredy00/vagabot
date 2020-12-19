@@ -15,7 +15,8 @@
         "CreatureKilled" : "Channel ID Here",
         "PlayerStateChanged" : "Channel ID Here",
         "UnauthorizedAccess" : "Channel ID Here",
-        "Cave" : "Channel ID Here"
+        "Cave" : "Channel ID Here",
+        "CordZones" : "Channel ID Here"
     },
 
     "discordRoles" :

@@ -871,7 +871,7 @@ async function main()
                             let oplayer = serverDetails.online_players[i];
                             botConnection.wrapper.send("player detailed " + oplayer.id).then(response =>{
 
-                                const area = ["Zone1", "Zone2", "Zone3", "Zone4"]
+                                const area = ["Zone1", "Zone2", "Zone3"]
                                 area.forEach(a => {
                                     const regex = /\((-*\d+.*\d*), (-*\d+.*\d*), (-*\d+.*\d*)\)/;
                                     [_, x, y, z] = response.Result.Position.match(regex);

@@ -1,0 +1,30 @@
+{
+    "Zone1": {
+        "access":[],
+        "minx":"",
+        "miny":"",
+        "minz":"",
+        "maxx":"",
+        "maxy":"",
+        "maxz":""
+    },
+    "Zone2": {
+        "access":[],
+        "minx":"",
+        "miny":"",
+        "minz":"",
+        "maxx":"",
+        "maxy":"",
+        "maxz":""
+        
+    },
+    "Zone3": {
+        "access":[],
+        "minx":"",
+        "miny":"",
+        "minz":"",
+        "maxx":"",
+        "maxy":"",
+        "maxz":""
+    }
+}

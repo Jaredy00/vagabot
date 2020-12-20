@@ -369,7 +369,7 @@ const commands = {
                                 botConnection.wrapper.send("trade atm add " + docs.id + " " + docs.Balance)
                                 players.update(
                                     { Discord: User }, 
-                                    { $set: { Balance: 0 } },
+                                    { $set: { Balance: 0, Bank: docs.Balance} },
                                     { upsert: true },
                                     updateHandler,
                                 ); 

@@ -288,7 +288,7 @@ const commands = {
             .addField('!Zone History (Chunk)', 'Replies with a list of every player to enter the chunk', false )
             .addField('!Playermessage (playername) (Message in quotes) (seconds)', 'Sends an ingame message to a player', false )
             .addField('!Verify (Token)', 'Links your Discord to your Ingame account using the Alta token(Same method as TownCrier)', false )
-            .addField('!Transfer (Discord or ATT) (Amount to Transfer)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )ddField('!Transfer (Discord or ATT)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
+            .addField('!Transfer (Discord or ATT) (Amount to Transfer)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
             .addField('!Balance (@Player)', 'Leave (@Player) blank to see your own balance or ping a player to see that players balance, Only works if the player has their account linked', false )
             .addField('!Pay (@Player) (Amount to send)', 'Send gold coins to other players over discord, Requires both you and the receiver to have linked their accounts', false )
             .addField('!STOP', 'Crashes the bot to down it', false )

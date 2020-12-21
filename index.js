@@ -86,7 +86,25 @@ function updateHandler( err, rows )
 const commands = {
     'Ping': (message) =>
     {
-        message.channel.send("pong");
+        /*
+        if(Number(message.author.id) === Number(743514151066009684)){ //Avitos ID
+            let pong = ["Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Pong"]
+            let rand = Math.floor(Math.random() * 10)
+            message.channel.send(pong[rand]);
+            message.channel.send("Bot is online");
+        }else{*/
+            if (talkedRecently2.has(message.author.id)) {
+                message.channel.send("Wait 1 minute before getting typing this again. - " + message.author);
+            }else{
+            message.channel.send("Pong"); 
+        }
+        // Adds the user to the set so that they can't talk for a minute
+        talkedRecently2.add(message.author.id);
+        setTimeout(() => {
+        // Removes the user from the set after a minute
+        talkedRecently2.delete(message.author.id);
+        }, 60000);
+        //}
     },
     'Where': (message, args) =>
     {
@@ -341,24 +359,42 @@ const commands = {
                         botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
                             players.findOne({ Discord: User }, function(err, docs) {
                                 if(docs.Balance){
-                                    var NewBal = Number(Response.Result) + Number(docs.Balance)
-                                    players.update(
-                                        { Discord: User }, 
-                                        { $set: { Balance: NewBal, Bank: 0 } },
-                                        { upsert: true },
-                                        updateHandler,
-                                    );
-                                    botConnection.wrapper.send("trade atm set " + docs.id + " 0")
-                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
+                                    var check = Number(Response.Result) - Number(args[1])
+                                    if(check >= 0){ 
+                                        if (Number.isInteger(args[1])) {
+                                            var NewBal = Number(args[1]) + Number(docs.Balance)
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal, Bank: 0 } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            botConnection.wrapper.send("trade atm set " + docs.id + " 0")
+                                            message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
+                                        }else{
+                                            message.channel.send('```' + "No fractions or decimals" + '```');
+                                        }
+                                    }else{
+                                        message.channel.send('```' + "You don't have that much" + '```');
+                                    }
                                 }else{
-                                    players.update(
-                                        { Discord: User }, 
-                                        { $set: { Balance: Number(Response.Result), Bank: 0 } },
-                                        { upsert: true },
-                                        updateHandler,
-                                    );
-                                    botConnection.wrapper.send("trade atm set " + docs.id + " 0")
-                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Response.Result + '```'); 
+                                    var check = Number(Response.Result) - Number(args[1])
+                                    if(check >= 0){ 
+                                        if (Number.isInteger(args[1])) {
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: Number(args[1]), Bank: 0 } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            botConnection.wrapper.send("trade atm set " + docs.id + " 0")
+                                            message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Response.Result + '```'); 
+                                        }else{
+                                            message.channel.send('```' + "No fractions or decimals" + '```');
+                                        }
+                                    }else{
+                                        message.channel.send('```' + "You don't have that much" + '```');
+                                    }
                                 }
                             });
                         })
@@ -366,16 +402,25 @@ const commands = {
                     if(args[0] === "ATT"){
                         players.findOne({ Discord: User }, function(err, docs) {
                             if(docs.Balance){
-                                botConnection.wrapper.send("trade atm add " + docs.id + " " + docs.Balance)
-                                players.update(
-                                    { Discord: User }, 
-                                    { $set: { Balance: 0, Bank: docs.Balance} },
-                                    { upsert: true },
-                                    updateHandler,
-                                ); 
-                                botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
-                                    message.channel.send('```' + "Your gold has now been transferred to the server and your new balance is " + Response.Result + '```');
-                                })
+                                var check = Number(docs.Balance) - Number(args[1])
+                                if(check >= 0){ 
+                                    if (Number.isInteger(args[1])) {
+                                        botConnection.wrapper.send("trade atm add " + docs.id + " " + docs.Balance)
+                                        players.update(
+                                            { Discord: User }, 
+                                            { $set: { Balance: 0, Bank: args[1]} },
+                                            { upsert: true },
+                                            updateHandler,
+                                        ); 
+                                        botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                                            message.channel.send('```' + "Your gold has now been transferred to the server and your new balance is " + Response.Result + '```');
+                                        })
+                                }else{
+                                    message.channel.send('```' + "No fractions or decimals" + '```');
+                                }
+                                }else{
+                                    message.channel.send('```' + "You don't have that much" + '```');
+                                }
                             }
                         });
                     }
@@ -509,27 +554,31 @@ const commands = {
                             if (err) throw err;
                             if (docs){
                                 players.findOne({ Discord: User }, function(err, docs) {
-                                    var NewBalself = docs.Balance - args[1]
-                                    if(NewBalself >= 0){ 
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: NewBalself } },
-                                            { upsert: true },
-                                            updateHandler,
-                                        );
-                                        players.findOne({ Discord: Recipient }, function(err, docs) {
-                                            var NewBalRecp = Number(docs.Balance) + Number(args[1])
+                                    if (Number.isInteger(args[1])) {
+                                        var NewBalself = docs.Balance - args[1]
+                                        if(NewBalself >= 0){ 
                                             players.update(
-                                                { Discord: Recipient }, 
-                                                { $set: { Balance: NewBalRecp } },
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBalself } },
                                                 { upsert: true },
                                                 updateHandler,
                                             );
-                                            message.channel.send( "You have sent " + args[1] + " gold coins to " + docs.username);
-                                        });
+                                            players.findOne({ Discord: Recipient }, function(err, docs) {
+                                                var NewBalRecp = Number(docs.Balance) + Number(args[1])
+                                                players.update(
+                                                    { Discord: Recipient }, 
+                                                    { $set: { Balance: NewBalRecp } },
+                                                    { upsert: true },
+                                                    updateHandler,
+                                                );
+                                                message.channel.send( "You have sent " + args[1] + " gold coins to " + docs.username);
+                                            });
+                                        }else{
+                                            //Not Enough Money
+                                            message.channel.send('```' + "You're trying to send money you don't have" + '```');
+                                        }
                                     }else{
-                                        //Not Enough Money
-                                        message.channel.send('```' + "You're trying to send money you don't have" + '```');
+                                        message.channel.send('```' + "No fractions or decimals" + '```');
                                     }
                                 });
                             }else{
@@ -560,7 +609,7 @@ const commands = {
         players.findOne({ Discord: User }, function(err, docs) {
             if(docs){
                 if(docs.Balance || Number(docs.Balance) == 0){
-                    if(Number(docs.Balance) >= args[1]){
+                    if(Number(docs.Balance) >= args[1]){ 
                         if(args[1] <= 65){
                             if (talkedRecently.has(message.author.id)) {
                                 message.channel.send("Wait 3 minute before getting typing this again. - " + message.author);

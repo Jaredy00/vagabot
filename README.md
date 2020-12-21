@@ -11,7 +11,7 @@ Using libraries provided by Alta VR:
 
 - ATT websocket connection library: https://github.com/alta-vr/att-websockets
 
-- Alta VR jsapi: https://github.com/alta-vr/alta-jsapi
+- Alta VR jsapi: https://github.com/officialpoiuytrewq4645/alta-jsapi
 
 
 ### Usage

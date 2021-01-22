@@ -1,26 +1,126 @@
 {
-    "targetServer" : "Server ID here",
+    "targetServer" : "",
 
     "discordPrefix" : "!",
 
     "discordChannels" :
     {
-        "InfoLog" : "Channel ID Here",
-        "PlayerJoined" : "Channel ID Here",
-        "PlayerLeft" : "Channel ID Here",
-        "PlayerKilled" : "Channel ID Here",
-        "PublicPlayerKilled" : "Channel ID Here",
-        "PlayerMovedChunk" : "Channel ID Here",
-        "TradeDeckUsed" : "Channel ID Here",
-        "CreatureKilled" : "Channel ID Here",
-        "PlayerStateChanged" : "Channel ID Here",
-        "UnauthorizedAccess" : "Channel ID Here",
-        "Cave" : "Channel ID Here",
-        "CordZones" : "Channel ID Here"
+        "InfoLog" : "",
+        "PlayerJoined" : "",
+        "PlayerLeft" : "",
+        "PlayerKilled" : "",
+        "PublicPlayerKilled" : "",
+        "PlayerMovedChunk" : "",
+        "TradeDeckUsed" : "",
+        "ObjectKilled" : "",
+        "PlayerStateChanged" : "",
+        "UnauthorizedAccess" : "",
+        "Trial" : "",
+        "Cave" : "",
+        "CordZones" : ""
     },
-
+    
     "discordRoles" :
     {
-        "admin" : [ "Role ID Here", "2nd Role ID Here" ]
+        "admin" : [ "" ]
+    },
+
+    "NoChunk": {
+        "Full Access": [],
+
+        "This is bobs house":[],
+        "Chunk ##-##" : []
+    },
+
+    "Zone":
+    {
+        "Zone1": {
+            "access":[],
+            "minx":"",
+            "miny":"",
+            "minz":"",
+            "maxx":"",
+            "maxy":"",
+            "maxz":""
+        },
+        "Zone2": {
+            "access":[],
+            "minx":"",
+            "miny":"",
+            "minz":"",
+            "maxx":"",
+            "maxy":"",
+            "maxz":""
+            
+        },
+        "Zone3": {
+            "access":[],
+            "minx":"",
+            "miny":"",
+            "minz":"",
+            "maxx":"",
+            "maxy":"",
+            "maxz":""
+        },
+        "Zone4": {
+            "access":[],
+            "minx":"",
+            "miny":"",
+            "minz":"",
+            "maxx":"",
+            "maxy":"",
+            "maxz":""
+        }
+    },
+
+    "Chunks": {
+        "Chunk2032": {
+            "Name":"Blacksmith"
+        },
+        "Chunk2031": {
+            "Name":"Near Blacksmith"
+        },
+        "Chunk2131": {
+            "Name":"Near Blacksmith shrine"
+        },
+        "Chunk2132": {
+            "Name":"Blacksmith Shrine"
+        },
+        "Chunk2133": {
+            "Name":"Respawn"
+        },
+        "Chunk1931": {
+            "Name":"Tavern"
+        },
+        "Chunk1932": {
+            "Name":"Tavern"
+        },
+        "Chunk2532": {
+            "Name":"Woodcut Shrine"
+        },
+        "Chunk2531": {
+            "Name":"Woodcut Shrine"
+        },
+        "Chunk2632": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2633": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2533": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2634": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2734": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2733": {
+            "Name":"Gotera small forest"
+        },
+        "Chunk2732": {
+            "Name":"Gotera small forest"
+        }
     }
 }

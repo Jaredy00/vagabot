@@ -1,7 +1,6 @@
 const moment = require('moment');
 const { username } = require("../credentials")
-const PlayerConfig = require('../PlayerConfig');
-const Chunks = require('../Chunks');
+const {Chunks, NoChunk} = require('../config');
 
 function now()
 {
@@ -26,34 +25,16 @@ function updateHandler( err, rows )
 
 const fs = require('fs');
 module.exports = class Subscriptions {
-    constructor( discordChannels, playersDb, killsDb, chunksDb, pendingCommandList) {
+    constructor( discordChannels, playersDb, killsDb, chunksDb) {
         this.discordChannels = discordChannels;
         this.playersDb = playersDb;
         this.killsDb = killsDb;
         this.chunksDb = chunksDb;
-        this.pendingCommandList = pendingCommandList;
     }
     wrapper = undefined
     SetWrapper( inWrapper ) {  this.wrapper = inWrapper }
     PlayerJoined( discord, data )
     {
-        /*
-        this.players.findOne({ id: data.player.id }, function(err, docs) {
-            try{
-                this.wrapper.send(`Player message '${docs.id}' "Welcome back '${data.player.username}' to An Adventures Tale" 5`);
-        }
-        catch{
-            this.wrapper.send(`Player message '${data.player.id}' "Welcome '${data.player.username}' to An Adventures Tale, Please join our discord" 5`);
-        }
-        });
-        this.players.findOne({ id: data.player.id }, function(err, docs) {
-            try{
-                if(docs.Entry == 'no'){}
-        }
-        catch{
-            this.wrapper.send(`Player message '${data.player.id}' "Welcome '${data.player.username}' to An Adventures Tale, Please join our discord" 5`);
-        }
-        });*/
         
         this.playersDb.update(
             { id: data.user.id }, 
@@ -103,8 +84,8 @@ module.exports = class Subscriptions {
             discord.channels.get(this.discordChannels["PlayerMovedChunk"] ).send('```' + ts_f() + "Player " + data.player.username + " has moved to " + Chunks[ChunkName].Name + " (" + data.newChunk + ")" + '```'); 
             }
         }
-        const allowedPlayers = PlayerConfig[data.newChunk];
-        const fullAccessPlayers = PlayerConfig["Full Access"];
+        const allowedPlayers = NoChunk[data.newChunk];
+        const fullAccessPlayers = NoChunk["Full Access"];
         // Special restrictions apply. If player is not explicitly allowed and player does not have full access, he should be teleported.
         if (allowedPlayers != null && !allowedPlayers.includes(data.player.id) && !fullAccessPlayers.includes(data.player.id))
         {
@@ -113,7 +94,7 @@ module.exports = class Subscriptions {
             console.log( "Player " + data.player.username + " has entered restricted area at " + data.newChunk );
         }
 
-}
+    }
 
     PlayerKilled( discord, data )
     {
@@ -165,13 +146,16 @@ module.exports = class Subscriptions {
     {
         discord.channels.get( this.discordChannels["TradeDeckUsed"] ).send('```' + ts_f() + data.quantity + " " + data.itemName + " Was bought for " + data.price + " Gold Coins " + '```');
         console.log( data.quantity + " " + data.itemName + " Was bought for " + data.price + " Gold Coins " );
+        //console.log(data)
     }
 
-    CreatureKilled( discord, data )
+    ObjectKilled( discord, data )
     {
-        discord.channels.get( this.discordChannels["CreatureKilled"] ).send('```' + ts_f() + "A " + data.PopulationName +" Has Died at " + data.ChunkIdentifier + '```');
-        console.log( "A " + data.PopulationName +" Has Died at " + data.ChunkIdentifier );
-        //console.log(data);
+        console.log(data);
+        if(data.killerPlayer){
+            discord.channels.get( this.discordChannels["ObjectKilled"] ).send('```' + ts_f() + "A " + data.name +" was killed by " + data.killerPlayer.username + '```');
+            console.log( "A " + data.name +" was killed by " + data.killerPlayer.username );
+        }
     }
 
     PlayerStateChanged( discord, data )
@@ -189,15 +173,25 @@ module.exports = class Subscriptions {
     
     }
 
-    TrialFinished( discord, data )
+    TrialStarted( discord, data )
     {
-        //discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + " " + data + '```');
+        var tplayers = '';
+        for( var i in data.players )
+        {
+            tplayers += data.players[i].username + ", "
+        }
+        discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + data.trial + " started by players " + tplayers + '```');
         console.log(data)
     }
 
     TrialFinished( discord, data )
     {
-        //discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + " " + data + '```');
+        var tplayers = '';
+        for( var i in data.players )
+        {
+            tplayers += data.players[i].username + ", "
+        }
+        discord.channels.get( this.discordChannels["Trial"] ).send('```' + ts_f() + data.trial + " finished by players " + tplayers + '```');
         console.log(data)
     }
 
@@ -216,15 +210,14 @@ module.exports = class Subscriptions {
                     let commandStr = commandDetails.content
                     let commandUser = found[2]
                     if ( commandUser != username )
-                    {if(commandUser != 'HazyMemories23'){
+                    {if(commandUser != 'Hazy'){
                         console.log( "Console command by "+ commandUser +" : "+ commandStr )
                         const InfoLogMessage = commandUser.length + commandStr.length + 36
                         //console.log(InfoLogMessage)
                         if(InfoLogMessage < 2000){
                         discord.channels.get( this.discordChannels["InfoLog"] ).send('```' + ts_f() + commandUser +" ran command: "+ commandStr + '```')   
                     } else{
-                        console.log("Mesage is too big")
-                        fs.appendFile('Command.txt', ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
+                        fs.writeFile('Command.txt', ts_f() + commandUser +" ran command: "+ commandStr, function( err ) {
                             if (err) throw err;
                         });
                         discord.channels.get( this.discordChannels["InfoLog"] ).send({files: ['Command.txt']})
@@ -233,7 +226,7 @@ module.exports = class Subscriptions {
                             if (err) throw err;
                         });
                     }
-                    if(commandUser == 'HazyMemories23'){
+                    if(commandUser == 'Hazy'){
                         console.log( "Console command by "+ commandUser +" : "+ commandStr )
                         fs.appendFile('logs.txt','\r\n' + ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
                             if (err) throw err;

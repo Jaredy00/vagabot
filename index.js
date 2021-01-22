@@ -9,7 +9,6 @@ const {Client, RichEmbed} = require('discord.js');
 const moment = require('moment');
 const sha512 = require('crypto-js/sha512');
 const fs = require('fs');
-const Zone = require('./Zones');
 const talkedRecently = new Set();
 
 //Local classes
@@ -18,7 +17,7 @@ const Subscriptions = require('./src/subscriptions.js');
 
 //Load information from credentials and config
 const { username, password, botToken } = require("./credentials");
-const { targetServer, showAllServers, discordPrefix, discordChannels, discordRoles } = require("./config");
+const { targetServer, showAllServers, discordPrefix, discordChannels, discordRoles, Zone, Chunks } = require("./config");
 
 //NeDB
 var Datastore = require('nedb');
@@ -33,11 +32,9 @@ var connectInterval = 30000; // milliseconds
 var serverPingInterval = 15000; // ms
 var subscriptionConnectInterval = 10000; //ms
 var RefreshSub = 300000; //ms
-var Playerl = 1000; //ms
 var serverConnectedState = false;
 var subscriptionsActive = false;
 var botConnection = {};
-var pendingCommandList = [];
 
 //Some utility helper functions and prototypes
 function ts()
@@ -84,29 +81,11 @@ function updateHandler( err, rows )
 
 //Command list
 const commands = {
-    'Ping': (message) =>
+    'ping': (message) =>
     {
-        /*
-        if(Number(message.author.id) === Number(743514151066009684)){ //Avitos ID
-            let pong = ["Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Bot is online", "Pong"]
-            let rand = Math.floor(Math.random() * 10)
-            message.channel.send(pong[rand]);
-            message.channel.send("Bot is online");
-        }else{*/
-            if (talkedRecently2.has(message.author.id)) {
-                message.channel.send("Wait 1 minute before getting typing this again. - " + message.author);
-            }else{
-            message.channel.send("Pong"); 
-        }
-        // Adds the user to the set so that they can't talk for a minute
-        talkedRecently2.add(message.author.id);
-        setTimeout(() => {
-        // Removes the user from the set after a minute
-        talkedRecently2.delete(message.author.id);
-        }, 60000);
-        //}
+        message.channel.send("Pong"); 
     },
-    'Where': (message, args) =>
+    'where': (message, args) =>
     {
         while ( args.length && args[0].toLowerCase() === "is" )
         {
@@ -119,17 +98,25 @@ const commands = {
             {
                 console.log( err );
             } else if ( !!player && player.lastChunk !== undefined ) {
-                message.channel.send( '```'+ username +" was last seen at "+ player.lastChunk +'```');
+                const p = player.lastChunk
+                const regex = /-/gi;
+                const c = p.replace(regex, '')
+                const ChunkName = c.replace(' ', '')
+                if(Chunks[ChunkName] === undefined){
+                    message.channel.send( '```'+ username +" was last seen at "+ player.lastChunk +'```');
+                }else{
+                    message.channel.send( '```'+ username +" was last seen at "+ Chunks[ChunkName].Name + " (" + player.lastChunk + ")" + '```');
+                }
             } else {
                 message.channel.send( '```'+ "No location known for "+ username +'```' );
             }
         });
     },
-    'Player' : async function ( message, args )
+    'player' : async function ( message, args )
     {
         switch( args.shift() )
         {
-            case 'Path':
+            case 'path':
                 // Return known history of player movements
                 var username = args.join(' ');
                 players.findOne({ username: username }, function( err, player ) {
@@ -166,7 +153,7 @@ const commands = {
             
         }
     },
-    'Players': async function (message, args)
+    'players': async function (message, args)
     {
         var servers = await Servers.getOnline();
         var listTable = '';
@@ -228,11 +215,11 @@ const commands = {
             message.channel.send('```'+ listTable +'```');
         }
     },
-    'Zone': async function (message, args)
+    'zone': async function (message, args)
     {
         switch( args.shift() )
         {
-            case 'History':
+            case 'history':
                 var chunkName = args.join(' ');
                 players.find({}, function( err, playerList ) {
                     chunkHistory.find({ chunk: chunkName }).sort({ ts: -1 }).exec( function( err, chunklist ) {
@@ -263,19 +250,7 @@ const commands = {
             break;
         }
     },
-    'Playermessage': (message, args) =>
-    {
-        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
-        //args[0] = player
-        //args[1] = message
-        //args[2] = seconds
-        botConnection.wrapper.send("player message " + args[0] + " " + "'" + args[1] + "'" + " " + args[2]);
-        message.channel.send( '```'+ "Message Sent" +'```' );
-        }else{
-            message.channel.send( '```'+ "No" +'```' );
-        }
-    },
-    'Help': (message) =>
+    'help': (message) =>
     {
         if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
             const Embed = new RichEmbed()
@@ -286,13 +261,13 @@ const commands = {
             .addField('!Player Path (playername)', 'Replies with a list of every chunk the player has entered', false )
             .addField('!Players', 'Replies with current online server', false )
             .addField('!Zone History (Chunk)', 'Replies with a list of every player to enter the chunk', false )
-            .addField('!Playermessage (playername) (Message in quotes) (seconds)', 'Sends an ingame message to a player', false )
             .addField('!Verify (Token)', 'Links your Discord to your Ingame account using the Alta token(Same method as TownCrier)', false )
             .addField('!Transfer (Discord or ATT) (Amount to Transfer)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
             .addField('!Balance (@Player)', 'Leave (@Player) blank to see your own balance or ping a player to see that players balance, Only works if the player has their account linked', false )
             .addField('!Pay (@Player) (Amount to send)', 'Send gold coins to other players over discord, Requires both you and the receiver to have linked their accounts', false )
             .addField('!STOP', 'Crashes the bot to down it', false )
-            .addField('!Roll (Odd or Even) (Amount to Bed)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
+            .addField('!Roll (Odd or Even) (Amount to Bet)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
+            .addField('!CMD (Console Command)', 'Sends commands to console, then replies with the results', false )
             .addField('!Help', 'Replies with a list of commands', false )
             message.channel.send(Embed);
         }else{
@@ -303,14 +278,15 @@ const commands = {
             .addField('!Where (playername)', 'Replies with the current location of a player', false )
             .addField('!Players', 'Replies with current online server', false )
             .addField('!Verify (Token)', 'Links your Discord to your Ingame account using the Alta token(Same method as TownCrier)', false )
-            .addField('!Transfer (Discord or ATT) (Amount to Transfer)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )            .addField('!Balance', 'Replies with both your balance on the server and in discord, Requires you to link your accounts with !link', false )
+            .addField('!Transfer (Discord or ATT) (Amount to Transfer)', 'Transfers your atm coin balance back and forth between discord and the server Requires you to link your accounts with !link', false )
+            .addField('!Balance', 'Replies with both your balance on the server and in discord, Requires you to link your accounts with !link', false )
             .addField('!Pay (@Player) (Amount to send)', 'Send gold coins to other players over discord, Requires both you and the receiver to have linked their accounts', false )
-            .addField('!Roll (Odd or Even) (Amount to Bed)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
+            .addField('!Roll (Odd or Even) (Amount to Bet)', 'You gamble your money the dice will roll and odd or even number if you win you gain whatever you bet if you lose you lose whatever you bet you cant bet what you dont have, Requires you to link your accounts with !link, This command has a 3 minute cooldown', false )
             .addField('!Help', 'Replies with a list of commands', false )
             message.channel.send(Embed);
         }
     },
-    'Verify': async function (message, args)
+    'verify': async function (message, args)
     {
         let key = args[0]
         try{
@@ -345,7 +321,7 @@ const commands = {
             message.channel.send('```' + "Invalid Token" + '```');
         }
     },
-    'Transfer': (message, args) =>
+    'transfer': (message, args) =>
     {
         const User = message.author.id
         players.findOne({ Discord: User }, async function(err, docs) {
@@ -354,75 +330,89 @@ const commands = {
                 var serverDetails = await Servers.getDetails( targetServer )
                 const isOnline = (player) => serverDetails.online_players.some(({ username }) => username === player); 
                 if(isOnline(docs.username)){
-                    if(args[0] === "Discord"){
-                        botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
-                            players.findOne({ Discord: User }, function(err, docs) {
-                                if(docs.Balance){
-                                    var check = Number(Response.Result) - Number(args[1])
-                                    if(check >= 0){ 
-                                        if (Number.isInteger(args[1])) {
-                                            var NewBal = Number(args[1]) + Number(docs.Balance)
-                                            players.update(
-                                                { Discord: User }, 
-                                                { $set: { Balance: NewBal, Bank: 0 } },
-                                                { upsert: true },
-                                                updateHandler,
-                                            );
-                                            botConnection.wrapper.send("trade atm set " + docs.id + " 0")
-                                            message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
+                    botConnection.wrapper.send("player detailed " + docs.id).then(Response=>{
+                        if(Response.Result.Chunk.includes('Chunk 21-33')){
+                            if(args[0] === "discord"){
+                                botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                                    players.findOne({ Discord: User }, function(err, docs) {
+                                        if(docs.Balance){
+                                            var check = Number(Response.Result) - Number(args[1])
+                                            if(check >= 0){ 
+                                                if (Number.isInteger(Number(args[1]))) {
+                                                    var New = Number(Response.Result) - Number(args[1])
+                                                    var NewBal = Number(args[1]) + Number(docs.Balance)
+                                                    players.update(
+                                                        { Discord: User }, 
+                                                        { $set: { Balance: NewBal, Bank: New } },
+                                                        { upsert: true },
+                                                        updateHandler,
+                                                    );
+                                                    botConnection.wrapper.send("trade atm set " + docs.id + " " + New)
+                                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
+                                                }else{
+                                                    message.channel.send('```' + "No fractions or decimals" + '```');
+                                                }
+                                            }else{
+                                                message.channel.send('```' + "You don't have that much" + '```');
+                                            }
                                         }else{
-                                            message.channel.send('```' + "No fractions or decimals" + '```');
+                                            var check = Number(Response.Result) - Number(args[1])
+                                            if(check >= 0){ 
+                                                if (Number.isInteger(Number(args[1]))) {
+                                                    var New = Number(Response.Result) - Number(args[1])
+                                                    players.update(
+                                                        { Discord: User }, 
+                                                        { $set: { Balance: Number(args[1]), Bank: New } },
+                                                        { upsert: true },
+                                                        updateHandler,
+                                                    );
+                                                    botConnection.wrapper.send("trade atm set " + docs.id + " " + New)
+                                                    message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Number(args[1]) + '```'); 
+                                                }else{
+                                                    message.channel.send('```' + "No fractions or decimals" + '```');
+                                                }
+                                            }else{
+                                                message.channel.send('```' + "You don't have that much" + '```');
+                                            }
                                         }
-                                    }else{
-                                        message.channel.send('```' + "You don't have that much" + '```');
-                                    }
-                                }else{
-                                    var check = Number(Response.Result) - Number(args[1])
-                                    if(check >= 0){ 
-                                        if (Number.isInteger(args[1])) {
-                                            players.update(
-                                                { Discord: User }, 
-                                                { $set: { Balance: Number(args[1]), Bank: 0 } },
-                                                { upsert: true },
-                                                updateHandler,
-                                            );
-                                            botConnection.wrapper.send("trade atm set " + docs.id + " 0")
-                                            message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Response.Result + '```'); 
-                                        }else{
-                                            message.channel.send('```' + "No fractions or decimals" + '```');
-                                        }
-                                    }else{
-                                        message.channel.send('```' + "You don't have that much" + '```');
-                                    }
-                                }
-                            });
-                        })
-                    }
-                    if(args[0] === "ATT"){
-                        players.findOne({ Discord: User }, function(err, docs) {
-                            if(docs.Balance){
-                                var check = Number(docs.Balance) - Number(args[1])
-                                if(check >= 0){ 
-                                    if (Number.isInteger(args[1])) {
-                                        botConnection.wrapper.send("trade atm add " + docs.id + " " + docs.Balance)
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: 0, Bank: Number(args[1])} },
-                                            { upsert: true },
-                                            updateHandler,
-                                        ); 
-                                        botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
-                                            message.channel.send('```' + "Your gold has now been transferred to the server and your new balance is " + Response.Result + '```');
-                                        })
-                                }else{
-                                    message.channel.send('```' + "No fractions or decimals" + '```');
-                                }
-                                }else{
-                                    message.channel.send('```' + "You don't have that much" + '```');
-                                }
+                                    });
+                                })
                             }
-                        });
-                    }
+                            if(args[0] === "aTT"){
+                                players.findOne({ Discord: User }, function(err, docs) {
+                                    if(docs.Balance){
+                                        var check = Number(docs.Balance) - Number(args[1])
+                                        if(check >= 0){ 
+                                            if (Number.isInteger(Number(args[1]))) {
+                                                botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                                                    var NewBal = Number(Response.Result) + Number(args[1])
+                                                    var New = Number(docs.Balance) - Number(args[1])
+                                                    players.update(
+                                                        { Discord: User }, 
+                                                        { $set: { Balance: New, Bank: NewBal} },
+                                                        { upsert: true },
+                                                        updateHandler,
+                                                    ); 
+                                                    botConnection.wrapper.send("trade atm add " + docs.id + " " + args[1])
+                                                    botConnection.wrapper.send("trade atm get " + docs.id).then(Response=>{
+                                                        message.channel.send('```' + "Your gold has now been transferred to the server and your new balance is " + Response.Result + '```');
+                                                    })
+                                                });
+                                            }else{
+                                                message.channel.send('```' + "No fractions or decimals" + '```');
+                                            }
+                                        }else{
+                                            message.channel.send('```' + "You don't have that much" + '```');
+                                        }
+                                    }else{
+                                        message.channel.send('```' + "You have no discord balance yet" + '```');
+                                    }
+                                });
+                            }
+                        }else{
+                            message.channel.send('```' + "You are not in the right Chunk, Please goto the spawn platform or Chunk 21-33 and try again" + '```');
+                        }
+                    })
                 }else{
                     message.channel.send('```' + "You are not online, Please join the server and Try again" + '```');
                 }
@@ -431,7 +421,7 @@ const commands = {
             }
         });
     },
-    'Balance': (message, args) =>
+    'balance': (message, args) =>
     {
         if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
             if(!args[0]){
@@ -503,6 +493,8 @@ const commands = {
                     }
                 });
 
+            }else{
+                message.channel.send('```' + "You did not ping someone" + '```');
             }
         }else{
             const User = message.author.id
@@ -540,7 +532,7 @@ const commands = {
             });
         }
     },
-    'Pay': (message, args) =>
+    'pay': (message, args) =>
     {
         const User = message.author.id
         const Recipient = message.mentions.members.first().id;
@@ -553,7 +545,7 @@ const commands = {
                             if (err) throw err;
                             if (docs){
                                 players.findOne({ Discord: User }, function(err, docs) {
-                                    if (Number.isInteger(args[1])) {
+                                    if (Number.isInteger(Number(args[1]))) {
                                         var NewBalself = docs.Balance - args[1]
                                         if(NewBalself >= 0){ 
                                             players.update(
@@ -602,7 +594,7 @@ const commands = {
             }
         });
     },
-    'Roll': (message, args) =>
+    'roll': (message, args) =>
     {
         const User = message.author.id
         players.findOne({ Discord: User }, function(err, docs) {
@@ -610,70 +602,74 @@ const commands = {
                 if(docs.Balance || Number(docs.Balance) == 0){
                     if(Number(docs.Balance) >= args[1]){ 
                         if(args[1] <= 65){
-                            if (talkedRecently.has(message.author.id)) {
-                                message.channel.send("Wait 3 minute before getting typing this again. - " + message.author);
-                            }else{
-                                if(args[0] == "Odd"){
-                                    var Dice = ["1","2","2","3","4","4","5","6","6"]
-                                    let random = Math.floor(Math.random() * 9);
-                                    let Num = Dice[random]
-                                    var Even = ["2","4","6"]
-                                    var Odd = ["1","3","5"]
-                                    if(Odd.includes(Num)){
-                                        var NewBal = Number(docs.Balance) + Number(args[1])
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: NewBal } },
-                                            { upsert: true },
-                                            updateHandler,
-                                        );
-                                        message.channel.send('```' + "You guested right the number was " + Num + "(Odd) You win" + '```');
-                                    }
-                                    if(Even.includes(Num)){
-                                        var NewBal = Number(docs.Balance) - Number(args[1])
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: NewBal } },
-                                            { upsert: true },
-                                            updateHandler,
-                                        );
-                                        message.channel.send('```' + "You guested wrong the number was " + Num + "(Even) You lose" + '```');
-                                    }
-                                }else if(args[0] == "Even"){
-                                    var Dice = ["1","1","2","3","3","4","5","5","6"]
-                                    let random = Math.floor(Math.random() * 10);
-                                    let Num = Dice[random]
-                                    var Even = ["2","4","6"]
-                                    var Odd = ["1","3","5"]
-                                    if(Even.includes(Num)){
-                                        var NewBal = Number(docs.Balance) + Number(args[1])
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: NewBal } },
-                                            { upsert: true },
-                                            updateHandler,
-                                        );
-                                        message.channel.send('```' + "You guested right the number was " + Num + "(Even) You win" + '```');
-                                    }
-                                    if(Odd.includes(Num)){
-                                        var NewBal = Number(docs.Balance) - Number(args[1])
-                                        players.update(
-                                            { Discord: User }, 
-                                            { $set: { Balance: NewBal } },
-                                            { upsert: true },
-                                            updateHandler,
-                                        );
-                                        message.channel.send('```' + "You guested Wrong the number was " + Num + "(Odd) You lose" + '```');
-                                    }
+                            if(Number.isInteger(Number(args[1]))){
+                                if (talkedRecently.has(message.author.id)) {
+                                    message.channel.send("Wait 3 minute before getting typing this again. - " + message.author);
                                 }else{
-                                    message.channel.send('```' + "pick Odd or Even" + '```');
+                                    if(args[0] == "odd"){
+                                        var Dice = ["1","2","2","3","4","4","5","6","6"]
+                                        let random = Math.floor(Math.random() * 9);
+                                        let Num = Dice[random]
+                                        var Even = ["2","4","6"]
+                                        var Odd = ["1","3","5"]
+                                        if(Odd.includes(Num)){
+                                            var NewBal = Number(docs.Balance) + Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested right the number was " + Num + "(Odd) You win" + '```');
+                                        }
+                                        if(Even.includes(Num)){
+                                            var NewBal = Number(docs.Balance) - Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested wrong the number was " + Num + "(Even) You lose" + '```');
+                                        }
+                                    }else if(args[0] == "even"){
+                                        var Dice = ["1","1","2","3","3","4","5","5","6"]
+                                        let random = Math.floor(Math.random() * 10);
+                                        let Num = Dice[random]
+                                        var Even = ["2","4","6"]
+                                        var Odd = ["1","3","5"]
+                                        if(Even.includes(Num)){
+                                            var NewBal = Number(docs.Balance) + Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested right the number was " + Num + "(Even) You win" + '```');
+                                        }
+                                        if(Odd.includes(Num)){
+                                            var NewBal = Number(docs.Balance) - Number(args[1])
+                                            players.update(
+                                                { Discord: User }, 
+                                                { $set: { Balance: NewBal } },
+                                                { upsert: true },
+                                                updateHandler,
+                                            );
+                                            message.channel.send('```' + "You guested Wrong the number was " + Num + "(Odd) You lose" + '```');
+                                        }
+                                    }else{
+                                        message.channel.send('```' + "pick Odd or Even" + '```');
+                                    }
+                                                // Adds the user to the set so that they can't talk for a minute
+                                    talkedRecently.add(message.author.id);
+                                    setTimeout(() => {
+                                    // Removes the user from the set after a minute
+                                    talkedRecently.delete(message.author.id);
+                                    }, 180000);
                                 }
-                                            // Adds the user to the set so that they can't talk for a minute
-                                talkedRecently.add(message.author.id);
-                                setTimeout(() => {
-                                // Removes the user from the set after a minute
-                                talkedRecently.delete(message.author.id);
-                                }, 180000);
+                            }else{
+                                message.channel.send('```' + "No fractions or decimals" + '```');
                             }
                         }else{
                             message.channel.send('```' + "You tried to bet too much the max is 65" + '```');
@@ -691,12 +687,45 @@ const commands = {
         });
 
     },
-    'STOP': (message, args) =>
+    'stop': (message) =>
     {
         if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
             if(end){
                 //Code never makes it here
                 //Crashes bot on purpose
+            }
+        }
+    },
+    'cmd': async function (message)
+    {
+        if ( message.member.roles.some( x => discordRoles.admin.includes( x.id ) )){
+            var serverDetails = await Servers.getDetails( targetServer )
+            if ( typeof( serverDetails.online_ping ) === 'undefined' ){
+                message.channel.send('```' + "Server is offline" + '```');
+            }else{
+                if(message.content.startsWith("!CMD")){
+                    let attcommand = message.content.replace("!CMD", "").trim();
+                    console.log(attcommand)
+                    botConnection.wrapper.send(attcommand).then(Response=>{
+                        //console.log(Response)
+                        if(typeof(Response.Result) != 'undefined'){
+                            message.channel.send('```json\n' + JSON.stringify(Response.Result, null, '\t') + '```');
+                        }else{
+                            message.channel.send('```json\n' + JSON.stringify(Response, null, '\t') + '```');
+                        }
+                    }); 
+                }else if(message.content.startsWith("!cmd")){
+                    let attcommand = message.content.replace("!cmd", "").trim();
+                    console.log(attcommand)
+                    botConnection.wrapper.send(attcommand).then(Response=>{
+                        //console.log(Response)
+                        if(typeof(Response.Result) != 'undefined'){
+                            message.channel.send('```json\n' + JSON.stringify(Response.Result, null, '\t') + '```');
+                        }else{
+                            message.channel.send('```json\n' + JSON.stringify(Response, null, '\t') + '```');
+                        }
+                    }); 
+                }
             }
         }
     },
@@ -776,10 +805,9 @@ async function main()
             var tmessage = message.content.substring(discordPrefix.length).trim();
 
             var args = splitArgs( tmessage );
-
             if ( args && args.length >= 1 )
             {
-                var command = args.shift();
+                var command = args.shift().toLowerCase();
                 var commandFunction = commands[command];
                 if (!!commandFunction)
                 {
@@ -789,7 +817,7 @@ async function main()
         }
     });
                     
-    var subs = new Subscriptions( discordChannels, players, kills, chunkHistory, pendingCommandList );
+    var subs = new Subscriptions( discordChannels, players, kills, chunkHistory );
 
     //Alta Login
     //Sessions.loginWithHash(username, mpassword);
@@ -807,23 +835,23 @@ async function main()
 				console.log( "Server is offline" )
 				serverConnectedState = false
 				if ( typeof( botConnection.wrapper ) != undefined && subscriptionsActive ) {
-					console.log( "Removing subscriptions")
+                    console.log( "Removing subscriptions")
 					botConnection.wrapper.emitter.removeAllListeners()
 					subscriptionsActive = false;
 				}
 			} else {
 				if ( !serverConnectedState )
-				{                    
+				{                  
 					console.log( "Server is online, connecting...")
-					var details = await Servers.joinConsole( targetServer )
+                    var details = await Servers.joinConsole( targetServer )
 					if ( details.allowed )
 					{
 						//console.log( details )
 						var connection = new Connection( details.name )
 						connection.onClose = (data) => {
 							try {
-								console.log("Server disconnected");
-								serverConnectedState = false;
+                                console.log("Server disconnected");
+                                serverConnectedState = false;
 								if ( typeof( botConnection.wrapper ) != undefined && subscriptionsActive ) {
                                     console.log( "Removing subscriptions");
                                     clearTimeout(Refresh);
@@ -833,7 +861,7 @@ async function main()
 								}
 							}
 							catch( e ) {
-								console.log("Error removing subscriptions, error: " + e.message);
+                                console.log("Error removing subscriptions, error: "+ e.message);
 							}
 						};
 						
@@ -841,7 +869,7 @@ async function main()
 						{
 							await connection.connect( details.connection.address, details.connection.websocket_port, details.token )
 						} catch( e ) {
-							console.log("Cannot connect to server, error: "+ e.message);
+                            console.log("Cannot connect to server, error: "+ e.message);
 							await sleep( connectInterval )
 							continue
 						}
@@ -866,27 +894,15 @@ async function main()
                         subscribeTo( "PlayerLeft", data => { subs.PlayerLeft( discord, data ) } )
                         subscribeTo( "PlayerKilled", data => { subs.PlayerKilled( discord, data ) } )
                         subscribeTo( "TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ) } )
-                        subscribeTo( "CreatureKilled", data => { subs.CreatureKilled( discord, data ) } )
+                        subscribeTo( "ObjectKilled", data => { subs.ObjectKilled( discord, data ) } )
                         subscribeTo( "PlayerStateChanged", data => { subs.PlayerStateChanged( discord, data ) } )
                         subscribeTo( "PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ) } )
                         subscribeTo( "TrialStarted", data => { subs.TrialStarted( discord, data ) } )
                         subscribeTo( "TrialFinished", data => { subs.TrialFinished( discord, data ) } )
-                        subscribeTo( "TraceLog", data => {
-                            if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
-                            {
-                                console.log( "the command is a module match" )
-                                // TODO: add a 'type' to pending commands to better match response items
-                                let command = pendingCommandList.shift();
-                                if ( command )
-                                {
-                                    console.log( "executing handler" )
-                                    command.handler( data.message );
-                                }
-                            }
-                        });
+
                         const Refresh = setTimeout(() => {
                             botConnection.wrapper.send("save now");
-                            console.log( "Removing subscriptions");
+                            console.log( "Refreshing connection");
                             botConnection.wrapper.emitter.removeAllListeners();
                             subscriptionsActive = false;
                             // Subscriptions
@@ -895,22 +911,11 @@ async function main()
                             subscribeTo( "PlayerLeft", data => { subs.PlayerLeft( discord, data ) } )
                             subscribeTo( "PlayerKilled", data => { subs.PlayerKilled( discord, data ) } )
                             subscribeTo( "TradeDeckUsed", data => { subs.TradeDeckUsed( discord, data ) } )
-                            subscribeTo( "CreatureKilled", data => { subs.CreatureKilled( discord, data ) } )
+                            subscribeTo( "ObjectKilled", data => { subs.ObjectKilled( discord, data ) } )
                             subscribeTo( "PlayerStateChanged", data => { subs.PlayerStateChanged( discord, data ) } )
                             subscribeTo( "PlayerMovedChunk", data => { subs.PlayerMovedChunk( discord, data ) } )
-                            subscribeTo( "TraceLog", data => {
-                                if ( pendingCommandList.length && data.logger === pendingCommandList[0].module )
-                                {
-                                    console.log( "the command is a module match" )
-                                    // TODO: add a 'type' to pending commands to better match response items
-                                    let command = pendingCommandList.shift();
-                                    if ( command )
-                                    {
-                                        console.log( "executing handler" )
-                                        command.handler( data.message );
-                                    }
-                                }
-                            });
+                            subscribeTo( "TrialStarted", data => { subs.TrialStarted( discord, data ) } )
+                            subscribeTo( "TrialFinished", data => { subs.TrialFinished( discord, data ) } )
                         }, RefreshSub);
 
                         const Playerloc = setInterval(() => {
@@ -918,32 +923,35 @@ async function main()
                         {
                             let oplayer = serverDetails.online_players[i];
                             botConnection.wrapper.send("player detailed " + oplayer.id).then(response =>{
-
-                                const area = ["Zone1", "Zone2", "Zone3"]
+                                const area = ["Zone1", "Zone2", "Zone3", "Zone4"]
                                 area.forEach(a => {
-                                    const regex = /\((-*\d+.*\d*), (-*\d+.*\d*), (-*\d+.*\d*)\)/;
-                                    [_, x, y, z] = response.Result.Position.match(regex);
-                                    let allowed = Zone[a].access
-                                    let realminx = Number(Zone[a].minx)
-                                    let realminy = Number(Zone[a].miny)
-                                    let realminz = Number(Zone[a].minz)
-                                    let realmaxx = Number(Zone[a].maxx)
-                                    let realmaxy = Number(Zone[a].miny)
-                                    let realmaxz = Number(Zone[a].maxz)
-                                    if (x >= realminx && x <= realmaxx && z >= realminz && z <= realmaxz && (y >= realminy && y <= realmaxy) && !allowed.includes(Number(oplayer.id))) {
-                                        console.log('x and z are a match');
-                                        discord.channels.get(discordChannels["CordZones"] ).send('```' + ts_f() + "Player " + oplayer.name + " has entered a restricted chunk at " + Zone[a] + '```');
-                                        botConnection.wrapper.send(`Player teleport '${oplayer.id}' RespawnPoint`);
-                                        botConnection.wrapper.send(`Player message '${oplayer.id}' "You entered restricted area" 5`);
+                                    if( typeof(response.Result) !== 'undefined'){
+                                        //console.log(response.Result)
+                                        const regex = /\((-*\d+.*\d*), (-*\d+.*\d*), (-*\d+.*\d*)\)/;
+                                        [_, x, y, z] = response.Result.Position.match(regex);
+                                        let allowed = Zone[a].access
+                                        //console.log(Zone[a])
+                                        let realminx = Number(Zone[a].minx)
+                                        let realminy = Number(Zone[a].miny)
+                                        let realminz = Number(Zone[a].minz)
+                                        let realmaxx = Number(Zone[a].maxx)
+                                        let realmaxy = Number(Zone[a].maxy)
+                                        let realmaxz = Number(Zone[a].maxz)
+                                        if (x >= realminx && x <= realmaxx && z >= realminz && z <= realmaxz && ((realminy == '' && realmaxy == '') || (y >= realminy && y <= realmaxy)) && !allowed.includes(Number(oplayer.id))) {
+                                            console.log('x and z are a match');
+                                            discord.channels.get(discordChannels["CordZones"] ).send('```' + "Player " + oplayer.username + " has entered a restricted zone at " + JSON.stringify(a) + '```');
+                                            botConnection.wrapper.send(`Player teleport '${oplayer.id}' RespawnPoint`);
+                                            botConnection.wrapper.send(`Player message '${oplayer.id}' "You entered restricted area" 5`);
+                                        }
                                     }
                                 });
                             })
                         }
                         }, 1000);
 					} else {
-						console.log( "Server is not connectable")
-						serverConnectedState = false
-						console.log( connDetails)
+                        console.log("Server is not connectable");
+                        serverConnectedState = false
+                        //console.log(details);
 					}
 				} else {
 					console.log( "Server is connected and alive")
@@ -953,7 +961,7 @@ async function main()
         
         }
 		catch (e) {
-			console.log("Critical error, exiting. " + e.message);
+            console.log("Critical error, exiting. " + e.message);
 		}
     }
     // end bot.run()

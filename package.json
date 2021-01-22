@@ -23,9 +23,10 @@
   },
   "homepage": "https://github.com/edencomputing/vagabot#readme",
   "dependencies": {
-    "alta-jsapi": "git+https://github.com/alta-vr/alta-jsapi.git",
+    "alta-jsapi": "git+https://github.com/officialpoiuytrewq4645/alta-jsapi.git",
     "att-bot-core": "git+https://github.com/alta-vr/ATT-Bot-JS.git",
     "discord.js": "^11.6.4",
+    "jwt-decode": "^3.1.2",
     "moment": "^2.27.0",
     "nedb": "^1.8.0",
     "save": "^2.4.0"

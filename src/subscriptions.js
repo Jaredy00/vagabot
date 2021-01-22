@@ -210,7 +210,7 @@ module.exports = class Subscriptions {
                     let commandStr = commandDetails.content
                     let commandUser = found[2]
                     if ( commandUser != username )
-                    {if(commandUser != 'Hazy'){
+                    {if(commandUser != 'YourName'){
                         console.log( "Console command by "+ commandUser +" : "+ commandStr )
                         const InfoLogMessage = commandUser.length + commandStr.length + 36
                         //console.log(InfoLogMessage)
@@ -226,7 +226,7 @@ module.exports = class Subscriptions {
                             if (err) throw err;
                         });
                     }
-                    if(commandUser == 'Hazy'){
+                    if(commandUser == 'YourName'){
                         console.log( "Console command by "+ commandUser +" : "+ commandStr )
                         fs.appendFile('logs.txt','\r\n' + ts_f() + commandUser +" ran command: "+ commandStr, (err) => {
                             if (err) throw err;

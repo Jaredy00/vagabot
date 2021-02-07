@@ -338,7 +338,7 @@ const commands = {
                                         if(docs.Balance){
                                             var check = Number(Response.Result) - Number(args[1])
                                             if(check >= 0){ 
-                                                if (Number.isInteger(Number(args[1]))) {
+                                                if (Number.isInteger(Number(args[1])) && Math.sign(args[1]) != -1) {
                                                     var New = Number(Response.Result) - Number(args[1])
                                                     var NewBal = Number(args[1]) + Number(docs.Balance)
                                                     players.update(
@@ -350,7 +350,7 @@ const commands = {
                                                     botConnection.wrapper.send("trade atm set " + docs.id + " " + New)
                                                     message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + NewBal + '```');
                                                 }else{
-                                                    message.channel.send('```' + "No fractions or decimals" + '```');
+                                                    message.channel.send('```' + "No fractions, decimals or negative numbers" + '```');
                                                 }
                                             }else{
                                                 message.channel.send('```' + "You don't have that much" + '```');
@@ -358,7 +358,7 @@ const commands = {
                                         }else{
                                             var check = Number(Response.Result) - Number(args[1])
                                             if(check >= 0){ 
-                                                if (Number.isInteger(Number(args[1]))) {
+                                                if (Number.isInteger(Number(args[1])) && Math.sign(args[1]) != -1) {
                                                     var New = Number(Response.Result) - Number(args[1])
                                                     players.update(
                                                         { Discord: User }, 
@@ -369,7 +369,7 @@ const commands = {
                                                     botConnection.wrapper.send("trade atm set " + docs.id + " " + New)
                                                     message.channel.send('```' + "Your gold has now been transferred to discord and your discord balance is " + Number(args[1]) + '```'); 
                                                 }else{
-                                                    message.channel.send('```' + "No fractions or decimals" + '```');
+                                                    message.channel.send('```' + "No fractions, decimals or negative numbers" + '```');
                                                 }
                                             }else{
                                                 message.channel.send('```' + "You don't have that much" + '```');
@@ -545,7 +545,7 @@ const commands = {
                             if (err) throw err;
                             if (docs){
                                 players.findOne({ Discord: User }, function(err, docs) {
-                                    if (Number.isInteger(Number(args[1]))) {
+                                    if (Number.isInteger(Number(args[1])) && Math.sign(args[1]) != -1) {
                                         var NewBalself = docs.Balance - args[1]
                                         if(NewBalself >= 0){ 
                                             players.update(
@@ -569,7 +569,7 @@ const commands = {
                                             message.channel.send('```' + "You're trying to send money you don't have" + '```');
                                         }
                                     }else{
-                                        message.channel.send('```' + "No fractions or decimals" + '```');
+                                        message.channel.send('```' + "No fractions, decimals or negative numbers" + '```');
                                     }
                                 });
                             }else{
@@ -602,7 +602,7 @@ const commands = {
                 if(docs.Balance || Number(docs.Balance) == 0){
                     if(Number(docs.Balance) >= args[1]){ 
                         if(args[1] <= 65){
-                            if(Number.isInteger(Number(args[1]))){
+                            if (Number.isInteger(Number(args[1])) && Math.sign(args[1]) != -1) {
                                 if (talkedRecently.has(message.author.id)) {
                                     message.channel.send("Wait 3 minute before getting typing this again. - " + message.author);
                                 }else{
@@ -669,7 +669,7 @@ const commands = {
                                     }, 180000);
                                 }
                             }else{
-                                message.channel.send('```' + "No fractions or decimals" + '```');
+                                message.channel.send('```' + "No fractions, decimals or negative numbers" + '```');
                             }
                         }else{
                             message.channel.send('```' + "You tried to bet too much the max is 65" + '```');

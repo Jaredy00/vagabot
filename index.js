@@ -917,7 +917,7 @@ async function main()
                             subscribeTo( "TrialStarted", data => { subs.TrialStarted( discord, data ) } )
                             subscribeTo( "TrialFinished", data => { subs.TrialFinished( discord, data ) } )
                         }, RefreshSub);
-
+/*
                         const Playerloc = setInterval(() => {
                         for ( var i in serverDetails.online_players )
                         {
@@ -948,6 +948,7 @@ async function main()
                             })
                         }
                         }, 1000);
+*/
 					} else {
                         console.log("Server is not connectable");
                         serverConnectedState = false

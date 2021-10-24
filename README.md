@@ -1,3 +1,7 @@
+# THIS CODE IS OUTDATED AND IS NO LONGER SUPPORTED AND/OR WORKS
+
+
+
 # vagabot
 A Township Tale NodeJS bot
 
